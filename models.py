@@ -10,6 +10,8 @@ class Utilisateur(db.Model, UserMixin):
     pwd = db.Column(db.String(50))
     email = db.Column(db.String(50), unique=True)
     role = db.Column(db.Enum('Médecin', 'Radiologue', 'Laborantin', 'Patient', name='role_enum'))
+    def get_id(self):
+        return str(self.ID_User)
 
 class MedecinTraitant(db.Model):
     ID = db.Column(db.Integer, primary_key=True)

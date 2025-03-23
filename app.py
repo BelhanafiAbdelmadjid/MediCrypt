@@ -48,7 +48,8 @@ def login():
         if user:
             login_user(user)
             return redirect(url_for('dashboard_medecin'))
-        return "Invalid credentials", 401
+        else:
+            flash("Invalid credentials. Please try again.", "danger")
     return render_template('login.html')
 
 @app.route('/logout')

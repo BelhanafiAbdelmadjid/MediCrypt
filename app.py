@@ -56,6 +56,62 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('home'))
+# ---------------------------------------------------------------------------- #
+#                                    Medecin                                   #
+# ---------------------------------------------------------------------------- #
+@app.route('/dashboard_medecin', endpoint='dashboard_medecin')
+@role_required('Médecin')
+def dashboard_medecin():
+    patients_actifs = MedecinTraitant.query.filter_by(medecin_ID=current_user.ID_User, actif=True).all()
+    return render_template('medecin/dashboard_medecin.html', patients_actifs=patients_actifs)
+
+@app.route('/dossier_medical/<int:patient_id>', endpoint='dossier_medical')
+@role_required('Médecin')
+def dossier_medical(patient_id):
+    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    if dossier:
+        return render_template('medecin/dossier_medical.html', dossier=dossier)
+    return "Dossier non trouvé", 404
+
+@app.route('/ajouter_patient', methods=['POST'], endpoint='ajouter_patient')
+@role_required('Médecin')
+def ajouter_patient():
+    patient_id = request.form['patient_id']
+    date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
+    date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
+
+    nouveau_traitant = MedecinTraitant(
+        medecin_ID=current_user.ID_User,
+        patient_ID=patient_id,
+        actif=True,
+        date_debut=date_debut,
+        date_fin=date_fin
+    )
+    db.session.add(nouveau_traitant)
+    db.session.commit()
+    return redirect(url_for('medecin/dashboard_medecin'))
+
+@app.route('/gerer_acces', methods=['POST'], endpoint='gerer_acces')
+@role_required('Médecin')
+def gerer_acces():
+    utilisateur_id = request.form['utilisateur_id']
+    patient_id = request.form['patient_id']
+    attributes = request.form['attributes']
+
+    nouvel_acces = Acces(
+        Utilisateur_ID=utilisateur_id,
+        attributes=attributes
+    )
+    db.session.add(nouvel_acces)
+    db.session.commit()
+    return redirect(url_for('medecin/dashboard_medecin'))
+
+@app.route('/historique_interactions', endpoint='historique_interactions')
+@role_required('Médecin')
+def historique_interactions():
+    interactions = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User).all()
+    return render_template('medecin/historique_interactions.html', interactions=interactions)
+# ---------------------------------------------------------------------------- #
 
 if __name__ == '__main__':
     with app.app_context():

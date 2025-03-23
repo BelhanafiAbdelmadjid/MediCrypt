@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Médecin</title>
+</head>
+<body>
+    <h2>Dashboard Médecin</h2>
+    <h3>Patients Actifs</h3>
+    <ul>
+        {% for patient in patients_actifs %}
+            <li>{{ patient.patient_ID }}: {{ patient.date_debut }} - {{ patient.date_fin }}</li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('logout') }}">Déconnexion</a>
+</body>
+</html>

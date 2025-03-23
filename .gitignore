@@ -1,0 +1,63 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.env
+*.venv
+
+# Flask specific
+instance/
+*.db
+*.sqlite3
+
+# Logs and debug files
+logs/
+*.log
+*.out
+*.err
+nohup.out
+
+# Config and secrets
+config.py
+.env
+*.pem
+*.key
+
+# Python cache and package files
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# VS Code settings
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Pytest cache
+.pytest_cache/
+
+# MyPy cache
+.mypy_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# MacOS & Linux system files
+.DS_Store
+*.swp
+*.swo
+*.swn

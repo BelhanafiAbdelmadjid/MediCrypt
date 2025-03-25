@@ -84,6 +84,13 @@ def dossier_medical(patient_id):
 def associer_patient():
     if request.method == 'POST':
         patient_id = request.form['patient_id']
+
+        # Vérifier si le patient existe réellement et a bien le rôle "Patient"
+        patient = Utilisateur.query.filter_by(ID_User=patient_id, role='Patient').first()
+        if not patient:
+            flash("Le patient spécifié n'existe pas.", "danger")
+            return redirect(url_for('associer_patient'))
+
         date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
         date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
 

@@ -171,13 +171,16 @@ def gerer_acces():
 
     return render_template('medecin/gerer_acces.html', acces_existants=acces_existants)
 
-
-
 @app.route('/historique_interactions', endpoint='historique_interactions')
 @role_required('Médecin')
 def historique_interactions():
-    interactions = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User).all()
+    # Récupérer les accès accordés aux patients du médecin
+    interactions = Acces.query.join(MedecinTraitant, Acces.Patient_ID == MedecinTraitant.patient_ID) \
+                              .filter(MedecinTraitant.medecin_ID == current_user.ID_User) \
+                              .all()
+
     return render_template('medecin/historique_interactions.html', interactions=interactions)
+
 # ---------------------------------------------------------------------------- #
 
 # ---------------------------------------------------------------------------- #

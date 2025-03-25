@@ -1,18 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Médecin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Dashboard Médecin</h2>
-    <h3>Patients Actifs</h3>
-    <ul>
-        {% for patient in patients_actifs %}
-            <li>{{ patient.patient_ID }}: {{ patient.date_debut }} - {{ patient.date_fin }}</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('logout') }}">Déconnexion</a>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-600">Dashboard Médecin</h1>
+        <a href="{{ url_for('logout') }}"
+            class="text-red-500 hover:text-red-700 font-semibold transition duration-300">Déconnexion</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Patients Actifs</h2>
+
+        <!-- Patients List -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <ul class="divide-y divide-gray-200">
+                {% for patient in patients_actifs %}
+                    <li class="py-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-lg font-medium text-gray-800">Patient ID: {{ patient.patient_ID }}</p>
+                            <p class="text-sm text-gray-500">Du {{ patient.date_debut }} au {{ patient.date_fin }}</p>
+                        </div>
+                        <a href="/dossier_medical/{{ patient.patient_ID }}"
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Voir Dossier</a>
+                    </li>
+                {% else %}
+                    <li class="py-4 text-gray-500">Aucun patient actif.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
+        &copy; 2025 MediCrypt. Tous droits réservés.
+    </footer>
 </body>
+
 </html>

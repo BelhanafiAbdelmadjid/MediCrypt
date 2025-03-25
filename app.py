@@ -79,23 +79,34 @@ def dossier_medical(patient_id):
         return render_template('medecin/dossier_medical.html', dossier=dossier)
     return "Dossier non trouvé", 404
 
-@app.route('/ajouter_patient', methods=['POST'], endpoint='ajouter_patient')
+@app.route('/associer_patient', methods=['GET', 'POST'], endpoint='associer_patient')
 @role_required('Médecin')
-def ajouter_patient():
-    patient_id = request.form['patient_id']
-    date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
-    date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
+def associer_patient():
+    if request.method == 'POST':
+        patient_id = request.form['patient_id']
+        date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
+        date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
 
-    nouveau_traitant = MedecinTraitant(
-        medecin_ID=current_user.ID_User,
-        patient_ID=patient_id,
-        actif=True,
-        date_debut=date_debut,
-        date_fin=date_fin
-    )
-    db.session.add(nouveau_traitant)
-    db.session.commit()
-    return redirect(url_for('medecin/dashboard_medecin'))
+        # Vérifier si le patient est déjà associé à ce médecin
+        existant = MedecinTraitant.query.filter_by(medecin_ID=current_user.ID_User, patient_ID=patient_id).first()
+        if existant:
+            flash("Ce patient est déjà sous votre responsabilité.", "warning")
+            return redirect(url_for('associer_patient'))
+
+        # Créer l'association médecin-patient
+        nouveau_traitant = MedecinTraitant(
+            medecin_ID=current_user.ID_User,
+            patient_ID=patient_id,
+            actif=True,
+            date_debut=date_debut,
+            date_fin=date_fin
+        )
+        db.session.add(nouveau_traitant)
+        db.session.commit()
+        flash("Association du patient réussie.", "success")
+        return redirect(url_for('dashboard_medecin'))
+
+    return render_template('medecin/associer_patient.html')
 
 @app.route('/gerer_acces', methods=['POST'], endpoint='gerer_acces')
 @role_required('Médecin')

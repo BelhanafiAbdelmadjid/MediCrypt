@@ -47,7 +47,12 @@ def login():
         user = Utilisateur.query.filter_by(email=email, pwd=password).first()
         if user:
             login_user(user)
-            return redirect(url_for('dashboard_medecin'))
+            print(user.role)
+            if user.role == 'Médecin':
+                return redirect(url_for('dashboard_medecin'))
+            elif user.role == 'Radiologue':
+                return redirect(url_for('dashboard_radiologue'))
+            # return redirect(url_for('dashboard_medecin'))
         else:
             flash("Invalid credentials. Please try again.", "danger")
     return render_template('login.html')
@@ -113,6 +118,73 @@ def historique_interactions():
     interactions = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User).all()
     return render_template('medecin/historique_interactions.html', interactions=interactions)
 # ---------------------------------------------------------------------------- #
+
+# ---------------------------------------------------------------------------- #
+#                                  Radiologue                                  #
+# ---------------------------------------------------------------------------- #
+
+@app.route('/dashboard_radiologue', endpoint='dashboard_radiologue')
+@login_required
+@role_required('Radiologue')
+def dashboard_radiologue():
+    # Récupérer les dossiers accessibles par le radiologue
+    accessible_dossiers = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User).all()
+    dossiers = []
+    for acces in accessible_dossiers:
+        dossier = ProfilMedical.query.filter_by(ID_Dossier=acces.ID_Acces).first()
+        if dossier:
+            dossiers.append(dossier)
+    return render_template('rediologue/dashboard_radiologue.html', dossiers=dossiers)
+
+@app.route('/ajouter_rapport/<int:dossier_id>', methods=['POST'], endpoint='ajouter_rapport')
+@login_required
+@role_required('Radiologue')
+def ajouter_rapport(dossier_id):
+    # Ajouter un rapport d'imagerie à un dossier médical
+    rapport = request.form.get('rapport')
+    if rapport:
+        dossier = ProfilMedical.query.get(dossier_id)
+        if dossier:
+            # Supposons que le dossier est un JSON, nous ajoutons le rapport à une clé "rapports"
+            if 'rapports' not in dossier.Dossier:
+                dossier.Dossier['rapports'] = []
+            dossier.Dossier['rapports'].append({
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'contenu': rapport
+            })
+            db.session.commit()
+            flash("Rapport ajouté avec succès.", "success")
+        else:
+            flash("Dossier non trouvé.", "danger")
+    else:
+        flash("Aucun rapport fourni.", "warning")
+
+    return redirect(url_for('dashboard_radiologue'))
+
+@app.route('/laisser_note/<int:dossier_id>', methods=['POST'], endpoint='laisser_note')
+@login_required
+@role_required('Radiologue')
+def laisser_note(dossier_id):
+    # Laisser une note ou un avis sur un dossier médical
+    note = request.form.get('note')
+    if note:
+        dossier = ProfilMedical.query.get(dossier_id)
+        if dossier:
+            # Supposons que le dossier est un JSON, nous ajoutons la note à une clé "notes"
+            if 'notes' not in dossier.Dossier:
+                dossier.Dossier['notes'] = []
+            dossier.Dossier['notes'].append({
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'contenu': note
+            })
+            db.session.commit()
+            flash("Note ajoutée avec succès.", "success")
+        else:
+            flash("Dossier non trouvé.", "danger")
+    else:
+        flash("Aucune note fournie.", "warning")
+
+    return redirect(url_for('dashboard_radiologue'))
 
 if __name__ == '__main__':
     with app.app_context():

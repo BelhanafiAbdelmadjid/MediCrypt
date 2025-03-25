@@ -27,12 +27,19 @@
         <form method="POST" action="{{ url_for('gerer_acces') }}">
             <input type="hidden" name="action" value="ajouter">
             <div class="mb-3">
-                <label for="utilisateur_id" class="form-label">ID du Professionnel (Radiologue/Laborantin)</label>
+                <label for="utilisateur_id" class="form-label">ID du Professionnel</label>
                 <input type="number" class="form-control" id="utilisateur_id" name="utilisateur_id" required>
             </div>
             <div class="mb-3">
                 <label for="patient_id" class="form-label">ID du Patient</label>
                 <input type="number" class="form-control" id="patient_id" name="patient_id" required>
+            </div>
+            <div class="mb-3">
+                <label for="role" class="form-label">Rôle</label>
+                <select class="form-control" id="role" name="role" required>
+                    <option value="Radiologue">Radiologue</option>
+                    <option value="Laborantin">Laborantin</option>
+                </select>
             </div>
             <div class="mb-3">
                 <label for="date_debut" class="form-label">Date de début</label>
@@ -52,6 +59,7 @@
                 <tr>
                     <th>ID Accès</th>
                     <th>ID Professionnel</th>
+                    <th>Rôle</th>
                     <th>ID Patient</th>
                     <th>Date Début</th>
                     <th>Date Fin</th>
@@ -63,6 +71,7 @@
                 <tr>
                     <td>{{ acces.ID_Acces }}</td>
                     <td>{{ acces.Utilisateur_ID }}</td>
+                    <td>{{ acces.role }}</td>
                     <td>{{ acces.Patient_ID }}</td>
                     <td>{{ acces.date_debut.strftime('%Y-%m-%d') }}</td>
                     <td>{{ acces.date_fin.strftime('%Y-%m-%d') }}</td>

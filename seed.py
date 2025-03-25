@@ -6,15 +6,17 @@ from app import app
 fake = Faker()
 
 def create_random_user(role):
+    """Crée un utilisateur avec un rôle spécifique."""
     return Utilisateur(
         nom=fake.last_name(),
         prenom=fake.first_name(),
-        pwd='password',  # Utilisez un mot de passe sécurisé dans un environnement réel
-        email=fake.email(),
+        pwd="password",  # Mot de passe non hashé (conforme à tes modèles)
+        email=fake.unique.email(),  # Évite les doublons d'email
         role=role
     )
 
 def seed_utilisateurs(count):
+    """Ajoute des utilisateurs aléatoires (médecins, radiologues, laborantins, patients)."""
     with app.app_context():
         utilisateurs = [create_random_user(random.choice(['Médecin', 'Radiologue', 'Laborantin', 'Patient'])) for _ in range(count)]
         db.session.add_all(utilisateurs)
@@ -22,6 +24,7 @@ def seed_utilisateurs(count):
         print(f"{count} utilisateurs créés.")
 
 def seed_medecin_traitant(count):
+    """Associe des médecins à des patients."""
     with app.app_context():
         medecins = Utilisateur.query.filter_by(role='Médecin').all()
         patients = Utilisateur.query.filter_by(role='Patient').all()
@@ -34,6 +37,11 @@ def seed_medecin_traitant(count):
         for _ in range(count):
             medecin = random.choice(medecins)
             patient = random.choice(patients)
+
+            # Éviter les doublons
+            if MedecinTraitant.query.filter_by(medecin_ID=medecin.ID_User, patient_ID=patient.ID_User).first():
+                continue
+
             relations.append(MedecinTraitant(
                 medecin_ID=medecin.ID_User,
                 patient_ID=patient.ID_User,
@@ -44,9 +52,10 @@ def seed_medecin_traitant(count):
 
         db.session.add_all(relations)
         db.session.commit()
-        print(f"{count} relations médecin-patient créées.")
+        print(f"{len(relations)} relations médecin-patient créées.")
 
 def seed_profils_medicaux(count):
+    """Ajoute des profils médicaux pour les patients."""
     with app.app_context():
         patients = Utilisateur.query.filter_by(role='Patient').all()
 
@@ -57,6 +66,11 @@ def seed_profils_medicaux(count):
         profils = []
         for _ in range(count):
             patient = random.choice(patients)
+
+            # Vérifier si un profil médical existe déjà
+            if ProfilMedical.query.filter_by(Patient_ID=patient.ID_User).first():
+                continue
+
             profils.append(ProfilMedical(
                 Patient_ID=patient.ID_User,
                 Dossier={
@@ -67,9 +81,10 @@ def seed_profils_medicaux(count):
 
         db.session.add_all(profils)
         db.session.commit()
-        print(f"{count} profils médicaux créés.")
+        print(f"{len(profils)} profils médicaux créés.")
 
 def seed_acces(count):
+    """Crée des accès pour les radiologues et laborantins vers des patients."""
     with app.app_context():
         patients = Utilisateur.query.filter_by(role='Patient').all()
         professionnels = Utilisateur.query.filter(Utilisateur.role.in_(['Radiologue', 'Laborantin'])).all()
@@ -82,14 +97,22 @@ def seed_acces(count):
         for _ in range(count):
             patient = random.choice(patients)
             professionnel = random.choice(professionnels)
+
+            # Vérifier si l'accès existe déjà
+            if Acces.query.filter_by(Utilisateur_ID=professionnel.ID_User, Patient_ID=patient.ID_User).first():
+                continue
+
             acces.append(Acces(
                 Utilisateur_ID=professionnel.ID_User,
-                attributes={"permission": fake.word()}
+                Patient_ID=patient.ID_User,
+                role=professionnel.role,
+                date_debut=fake.date_between(start_date='-1y', end_date='today'),
+                date_fin=fake.date_between(start_date='+1y', end_date='+2y')
             ))
 
         db.session.add_all(acces)
         db.session.commit()
-        print(f"{count} accès créés.")
+        print(f"{len(acces)} accès créés.")
 
 if __name__ == '__main__':
     with app.app_context():

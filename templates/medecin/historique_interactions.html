@@ -1,17 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historique des Interactions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Historique des Interactions</h2>
-    <ul>
-        {% for interaction in interactions %}
-            <li>{{ interaction.attributes }}</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('dashboard_medecin') }}">Retour au Dashboard</a>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-600">Historique des Interactions</h1>
+        <a href="{{ url_for('dashboard_medecin') }}"
+            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dashboard</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Liste des Interactions</h2>
+
+            {% if interactions %}
+                <div class="space-y-4">
+                    {% for interaction in interactions %}
+                        <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
+                            <h3 class="font-semibold text-blue-600">Interaction {{ loop.index }}</h3>
+                            <p class="text-gray-700 mt-2">{{ interaction.historique }}</p>
+
+                            {% if interaction.traitements %}
+                                <h4 class="font-medium text-gray-600 mt-3">Traitements :</h4>
+                                <ul class="list-disc list-inside text-gray-700">
+                                    {% for traitement in interaction.traitements %}
+                                        <li>{{ traitement }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500">Aucune interaction enregistrée.</p>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
+        &copy; 2025 MediCrypt. Tous droits réservés.
+    </footer>
 </body>
+
 </html>

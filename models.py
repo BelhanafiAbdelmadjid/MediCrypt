@@ -28,5 +28,8 @@ class ProfilMedical(db.Model):
 
 class Acces(db.Model):
     ID_Acces = db.Column(db.Integer, primary_key=True)
-    Utilisateur_ID = db.Column(db.Integer, db.ForeignKey('utilisateur.ID_User'))
-    attributes = db.Column(db.JSON)
+    Utilisateur_ID = db.Column(db.Integer, db.ForeignKey('utilisateur.ID_User'))  # Radiologue ou Laborantin
+    Patient_ID = db.Column(db.Integer, db.ForeignKey('utilisateur.ID_User'))  # Patient dont l'accès est accordé
+    type_acces = db.Column(db.Enum('Lecture', 'Écriture', 'Modification', name='type_acces_enum'))  # Type d'accès
+    date_debut = db.Column(db.Date)
+    date_fin = db.Column(db.Date)

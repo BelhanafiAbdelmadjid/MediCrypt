@@ -108,20 +108,58 @@ def associer_patient():
 
     return render_template('medecin/associer_patient.html')
 
-@app.route('/gerer_acces', methods=['POST'], endpoint='gerer_acces')
+@app.route('/gerer_acces', methods=['GET', 'POST'], endpoint='gerer_acces')
 @role_required('Médecin')
 def gerer_acces():
-    utilisateur_id = request.form['utilisateur_id']
-    patient_id = request.form['patient_id']
-    attributes = request.form['attributes']
+    if request.method == 'POST':
+        action = request.form.get('action')
 
-    nouvel_acces = Acces(
-        Utilisateur_ID=utilisateur_id,
-        attributes=attributes
-    )
-    db.session.add(nouvel_acces)
-    db.session.commit()
-    return redirect(url_for('medecin/dashboard_medecin'))
+        # Ajouter un accès
+        if action == 'ajouter':
+            utilisateur_id = request.form['utilisateur_id']
+            patient_id = request.form['patient_id']
+            date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
+            date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
+
+            # Vérifier si un accès existe déjà
+            acces_existant = Acces.query.filter_by(
+                Utilisateur_ID=utilisateur_id, 
+                Patient_ID=patient_id
+            ).first()
+            if acces_existant:
+                flash("Cet utilisateur a déjà accès au dossier du patient.", "warning")
+                return redirect(url_for('gerer_acces'))
+
+            # Création d'un nouvel accès
+            nouvel_acces = Acces(
+                Utilisateur_ID=utilisateur_id,
+                Patient_ID=patient_id,
+                date_debut=date_debut,
+                date_fin=date_fin
+            )
+            db.session.add(nouvel_acces)
+            db.session.commit()
+            flash("Accès accordé avec succès.", "success")
+
+        # Révoquer un accès
+        elif action == 'supprimer':
+            acces_id = request.form['acces_id']
+            acces = Acces.query.get(acces_id)
+            if acces:
+                db.session.delete(acces)
+                db.session.commit()
+                flash("Accès révoqué avec succès.", "success")
+            else:
+                flash("Accès introuvable.", "danger")
+
+        return redirect(url_for('gerer_acces'))
+
+    # Liste des accès existants pour les patients du médecin
+    acces_existants = Acces.query.join(MedecinTraitant, Acces.Patient_ID == MedecinTraitant.patient_ID)\
+                                 .filter(MedecinTraitant.medecin_ID == current_user.ID_User)\
+                                 .all()
+    return render_template('medecin/gerer_acces.html', acces_existants=acces_existants)
+
 
 @app.route('/historique_interactions', endpoint='historique_interactions')
 @role_required('Médecin')

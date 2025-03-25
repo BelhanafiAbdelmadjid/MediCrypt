@@ -1,13 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dossier Médical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Dossier Médical</h2>
-    <pre>{{ dossier.Dossier | safe }}</pre>
-    <a href="{{ url_for('dashboard_medecin') }}">Retour au Dashboard</a>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-600">Dossier Médical</h1>
+        <a href="{{ url_for('dashboard_medecin') }}"
+            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dashboard</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Détails du Dossier</h2>
+
+            <!-- Historique du dossier -->
+            <div class="mb-6">
+                <h3 class="text-lg font-medium text-gray-600">Historique :</h3>
+                <p class="bg-gray-50 p-4 rounded-lg text-gray-800 leading-relaxed">
+                    {{ dossier.Dossier.historique }}
+                </p>
+            </div>
+
+            <!-- Traitements -->
+            <div>
+                <h3 class="text-lg font-medium text-gray-600">Traitements :</h3>
+                <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
+                    {% for traitement in dossier.Dossier.traitements %}
+                        <li>{{ traitement }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
+        &copy; 2025 MediCrypt. Tous droits réservés.
+    </footer>
 </body>
+
 </html>

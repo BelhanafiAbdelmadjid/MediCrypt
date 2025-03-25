@@ -19,7 +19,7 @@ Bienvenue dans le backend de la plateforme eHealth. Ce document vous guidera à 
 1. **Cloner le dépôt** :
    ```bash
    git clone <URL_DU_DEPOT>
-   cd ehealth-platform
+   cd medicrypt
    ```
 
 2. **Créer un environnement virtuel** :

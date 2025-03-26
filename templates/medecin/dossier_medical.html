@@ -1,15 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dossier Médical</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-gray-100 min-h-screen flex flex-col">
-    <!-- Header -->
+
     <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-blue-600">Dossier Médical</h1>
         <div class="flex gap-4">
@@ -24,13 +22,11 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 p-8">
         <div class="bg-white shadow-md rounded-lg p-6">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Détails du Dossier</h2>
 
             {% if 'historique' in dossier %}
-            <!-- Historique du dossier -->
             <div class="mb-6">
                 <h3 class="text-lg font-medium text-gray-600">Historique :</h3>
                 <p class="bg-gray-50 p-4 rounded-lg text-gray-800 leading-relaxed">
@@ -40,7 +36,6 @@
             {% endif %}
 
             {% if 'traitements' in dossier %}
-            <!-- Traitements -->
             <div class="mb-6">
                 <h3 class="text-lg font-medium text-gray-600">Traitements :</h3>
                 <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
@@ -52,24 +47,28 @@
             {% endif %}
 
             {% if 'analyses' in dossier %}
-            <!-- Analyses -->
             <div class="mb-6">
                 <h3 class="text-lg font-medium text-gray-600">Analyses :</h3>
                 <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
                     {% for analyse in dossier.analyses %}
-                        <li>{{ analyse.type }} - {{ analyse.date }} : <strong>{{ analyse.valeur }}</strong></li>
+                        <li>
+                            {{ analyse.type }} - {{ analyse.date }} : <strong>{{ analyse.valeur }}</strong><br>
+                            <span class="text-sm text-gray-500">Réalisé par : {{ analyse.laborantin_nom }} (ID: {{ analyse.laborantin_id }})</span>
+                        </li>
                     {% endfor %}
                 </ul>
             </div>
             {% endif %}
 
             {% if 'imagerie' in dossier %}
-            <!-- Rapports d'Imagerie -->
             <div class="mb-6">
                 <h3 class="text-lg font-medium text-gray-600">Rapports d'Imagerie :</h3>
                 <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
                     {% for imagerie in dossier.imagerie %}
-                        <li>{{ imagerie.type }} - {{ imagerie.date }} : <strong>{{ imagerie.résultat }}</strong></li>
+                        <li>
+                            {{ imagerie.type }} - {{ imagerie.date }} : <strong>{{ imagerie.résultat }}</strong><br>
+                            <span class="text-sm text-gray-500">Réalisé par : {{ imagerie.radiologue_nom }} (ID: {{ imagerie.radiologue_id }})</span>
+                        </li>
                     {% endfor %}
                 </ul>
             </div>
@@ -77,10 +76,8 @@
         </div>
     </main>
 
-    <!-- Footer -->
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
         &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
 </body>
-
 </html>

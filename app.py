@@ -53,6 +53,8 @@ def login():
                 return redirect(url_for('dashboard_medecin'))
             elif user.role == 'Radiologue':
                 return redirect(url_for('dashboard_radiologue'))
+            elif user.role == 'Laborantin':
+                return redirect(url_for('dashboard_laborantin'))
             # return redirect(url_for('dashboard_medecin'))
         else:
             flash("Invalid credentials. Please try again.", "danger")
@@ -209,7 +211,6 @@ def modifier_dossier(patient_id):
         flash("Dossier médical mis à jour avec succès.", "success")
         return redirect(url_for('dossier_medical', patient_id=patient_id))
 
-    print("Dossier to return",type(dossier.Dossier["traitements"][0]),dossier.Dossier["traitements"][0])
     return render_template('medecin/modifier_dossier.html', dossier=dossier)
 
 
@@ -242,7 +243,17 @@ def associer_patient():
             date_debut=date_debut,
             date_fin=date_fin
         )
+        nouveau_dossier =  ProfilMedical(
+            Patient_ID=patient_id,
+            Dossier={
+                "historique": "",
+                "traitements": [],
+                "imagerie": [],
+                "analyses": []
+            }
+        )
         db.session.add(nouveau_traitant)
+        db.session.add(nouveau_dossier)
         db.session.commit()
         flash("Association du patient réussie.", "success")
         return redirect(url_for('dashboard_medecin'))
@@ -459,6 +470,149 @@ def modifier_imagerie(patient_id, index):
             return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
 
     return render_template('radiologue/modifier_imagerie.html', patient_id=patient_id, rapport=rapport)
+
+# Laborantin 
+@app.route('/dashboard_laborantin', endpoint='dashboard_laborantin')
+@role_required('Laborantin')
+def dashboard_laborantin():
+    # Retrieve accessible patient dossiers
+    dossiers = db.session.query(ProfilMedical, Utilisateur) \
+        .join(Utilisateur, ProfilMedical.Patient_ID == Utilisateur.ID_User) \
+        .join(Acces, ProfilMedical.Patient_ID == Acces.Patient_ID) \
+        .filter(Acces.Utilisateur_ID == current_user.ID_User, Acces.role == 'Laborantin') \
+        .all()
+
+    return render_template('laborantin/dashboard_laborantin.html', dossiers=dossiers)
+
+@app.route('/dossier_medical_laborantin/<int:patient_id>', endpoint='dossier_medical_laborantin')
+@role_required('Laborantin')
+def dossier_medical_laborantin(patient_id):
+    # Check if the lab technician has access
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    if not acces:
+        flash("Vous n'avez pas accès à ce dossier.", "danger")
+        return redirect(url_for('dashboard_laborantin'))
+
+    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    if not dossier:
+        flash("Dossier médical introuvable.", "danger")
+        return redirect(url_for('dashboard_laborantin'))
+
+    # The lab technician only sees "analyses"
+    analyses = dossier.Dossier.get("analyses", [])
+
+    return render_template('laborantin/dossier_medical_laborantin.html', dossier=analyses, patient_id=patient_id, Utilisateur=Utilisateur)
+
+@app.route('/ajouter_analyse/<int:patient_id>', methods=['GET', 'POST'], endpoint='ajouter_analyse')
+@role_required('Laborantin')
+def ajouter_analyse(patient_id):
+    # Verify if the lab technician has access
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    if not acces:
+        flash("Vous n'avez pas accès à ce dossier.", "danger")
+        return redirect(url_for('dashboard_laborantin'))
+
+    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    if not dossier:
+        flash("Dossier médical introuvable.", "danger")
+        return redirect(url_for('dashboard_laborantin'))
+
+    if request.method == 'POST':
+        type_analyse = request.form.get('type')
+        valeur = request.form.get('valeur')
+        date = datetime.today().strftime('%Y-%m-%d')
+
+        # Load current dossier data
+        dossier_data = dossier.Dossier.copy() if dossier.Dossier else {}
+
+        # Add "analyses" section if it doesn't exist
+        if "analyses" not in dossier_data:
+            dossier_data["analyses"] = []
+
+        # Add the new analysis
+        dossier_data["analyses"].append({
+            "type": type_analyse,
+            "date": date,
+            "valeur": valeur,
+            "ajouté_par": current_user.ID_User  
+        })
+
+        # Force updating the JSON column
+        db.session.execute(
+            ProfilMedical.__table__.update()
+            .where(ProfilMedical.Patient_ID == patient_id)
+            .values(Dossier=dossier_data)
+        )
+        db.session.commit()
+
+        flash("Analyse ajoutée avec succès.", "success")
+        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+
+    return render_template('laborantin/ajouter_analyse.html', patient_id=patient_id)
+
+@app.route('/modifier_analyse/<int:patient_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_analyse')
+@role_required('Laborantin')
+def modifier_analyse(patient_id, index):
+    # Verify if the lab technician has access
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    if not acces:
+        flash("Vous n'avez pas accès à ce dossier.", "danger")
+        return redirect(url_for('dashboard_laborantin'))
+
+    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    if not dossier or "analyses" not in dossier.Dossier or index >= len(dossier.Dossier["analyses"]):
+        flash("Analyse introuvable.", "danger")
+        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+
+    # Get the analysis
+    analyse = dossier.Dossier["analyses"][index]
+
+    # Only the original author can modify or delete it
+    if "ajouté_par" not in analyse or analyse["ajouté_par"] != current_user.ID_User:
+        flash("Vous ne pouvez modifier ou supprimer que les analyses que vous avez ajoutées.", "danger")
+        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+
+    if request.method == 'POST':
+        if 'delete' in request.form:
+            dossier_data = dossier.Dossier.copy()
+            del dossier_data["analyses"][index]
+
+            # Force updating the JSON column
+            db.session.execute(
+                ProfilMedical.__table__.update()
+                .where(ProfilMedical.Patient_ID == patient_id)
+                .values(Dossier=dossier_data)
+            )
+            db.session.commit()
+
+            flash("Analyse supprimée avec succès.", "success")
+            return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+
+        else:  # Update analysis
+            type_analyse = request.form.get('type')
+            valeur = request.form.get('valeur')
+
+            # Load current dossier data
+            dossier_data = dossier.Dossier.copy()
+
+            # Update the analysis
+            dossier_data["analyses"][index]["type"] = type_analyse
+            dossier_data["analyses"][index]["valeur"] = valeur
+            dossier_data["analyses"][index]["modifié_par"] = current_user.ID_User  
+
+            # Force updating the JSON column
+            db.session.execute(
+                ProfilMedical.__table__.update()
+                .where(ProfilMedical.Patient_ID == patient_id)
+                .values(Dossier=dossier_data)
+            )
+            db.session.commit()
+
+            flash("Analyse modifiée avec succès.", "success")
+            return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+
+    return render_template('laborantin/modifier_analyse.html', patient_id=patient_id, analyse=analyse)
+
 
 if __name__ == '__main__':
     with app.app_context():

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifier une Analyse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-600">Modifier une Analyse</h1>
+        <a href="{{ url_for('dossier_medical_laborantin', patient_id=patient_id) }}" 
+            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour</a>
+    </header>
+
+    <main class="flex-1 p-8">
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-3 mb-4 text-white bg-{{ 'red' if category == 'danger' else 'blue' }}-600 rounded">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+                <div class="mb-4">
+                    <label for="type" class="block text-gray-700 font-medium">Type d'Analyse</label>
+                    <input type="text" id="type" name="type" value="{{ analyse.type }}"
+                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="mb-4">
+                    <label for="valeur" class="block text-gray-700 font-medium">Valeur</label>
+                    <input type="text" id="valeur" name="valeur" value="{{ analyse.valeur }}"
+                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="flex gap-4">
+                    <button type="submit" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">
+                        Modifier Analyse
+                    </button>
+                    <button type="submit" name="delete" value="1" 
+                        class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">
+                        Supprimer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
+        &copy; 2025 MediCrypt. Tous droits réservés.
+    </footer>
+</body>
+</html>

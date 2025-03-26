@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, current_user, logout_user
 from datetime import datetime
 from models import db, Utilisateur, MedecinTraitant, ProfilMedical, Acces
+import json
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ehealth.db'
@@ -68,16 +69,139 @@ def logout():
 @app.route('/dashboard_medecin', endpoint='dashboard_medecin')
 @role_required('Médecin')
 def dashboard_medecin():
-    patients_actifs = MedecinTraitant.query.filter_by(medecin_ID=current_user.ID_User, actif=True).all()
-    return render_template('medecin/dashboard_medecin.html', patients_actifs=patients_actifs)
+    # Récupérer les patients actifs avec leurs informations
+    patients_actifs = db.session.query(Utilisateur).join(MedecinTraitant, Utilisateur.ID_User == MedecinTraitant.patient_ID) \
+                        .filter(MedecinTraitant.medecin_ID == current_user.ID_User, MedecinTraitant.actif == True).all()
+
+    # Récupérer les radiologues et laborantins
+    radiologues = Utilisateur.query.filter_by(role="Radiologue").all()
+    laborantins = Utilisateur.query.filter_by(role="Laborantin").all()
+
+    return render_template(
+        'medecin/dashboard_medecin.html',
+        patients_actifs=patients_actifs,
+        radiologues=radiologues,
+        laborantins=laborantins
+    )
 
 @app.route('/dossier_medical/<int:patient_id>', endpoint='dossier_medical')
-@role_required('Médecin')
+@login_required
 def dossier_medical(patient_id):
+    # Vérifier si le dossier médical existe
     dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
-    if dossier:
-        return render_template('medecin/dossier_medical.html', dossier=dossier)
-    return "Dossier non trouvé", 404
+    if not dossier:
+        flash("Dossier médical introuvable.", "danger")
+        return redirect(url_for('dashboard_medecin'))
+
+    # Vérifier si l'utilisateur a les permissions d'accès
+    if current_user.role == "Médecin":
+        # Vérifier si ce médecin est responsable de ce patient
+        est_medecin_du_patient = MedecinTraitant.query.filter_by(
+            medecin_ID=current_user.ID_User, patient_ID=patient_id
+        ).first()
+        if not est_medecin_du_patient:
+            flash("Vous n'avez pas accès à ce dossier.", "danger")
+            return redirect(url_for('dashboard_medecin'))
+        donnees_dossier = dossier.Dossier  # Le médecin voit tout
+
+    elif current_user.role in ["Radiologue", "Laborantin"]:
+        # Vérifier si cet utilisateur a accès via la table Acces
+        acces_autorise = Acces.query.filter_by(
+            Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id
+        ).first()
+        if not acces_autorise:
+            flash("Vous n'avez pas accès à ce dossier.", "danger")
+            return redirect(url_for('dashboard_medecin'))
+
+        # Le Laborantin ne voit que les analyses
+        if current_user.role == "Laborantin":
+            donnees_dossier = {"analyses": dossier.Dossier.get("analyses", [])}
+
+        # Le Radiologue ne voit que l'imagerie
+        elif current_user.role == "Radiologue":
+            donnees_dossier = {"imagerie": dossier.Dossier.get("imagerie", [])}
+
+    else:
+        flash("Accès refusé.", "danger")
+        return redirect(url_for('home'))
+    donnees_dossier["Patient_ID"] = patient_id
+    # Passer les données du dossier et l'ID du patient au template
+    return render_template('medecin/dossier_medical.html', dossier=donnees_dossier)
+
+@app.route('/modifier_dossier/<int:patient_id>', methods=['GET', 'POST'], endpoint='modifier_dossier')
+@role_required('Médecin')
+def modifier_dossier(patient_id):
+    # Vérifier si le dossier médical du patient existe
+    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    if not dossier:
+        flash("Dossier médical introuvable.", "danger")
+        return redirect(url_for('dashboard_medecin'))
+
+    # Vérifier que le médecin a bien ce patient sous sa responsabilité
+    relation = MedecinTraitant.query.filter_by(medecin_ID=current_user.ID_User, patient_ID=patient_id).first()
+    if not relation:
+        flash("Vous n'êtes pas autorisé à modifier ce dossier.", "danger")
+        return redirect(url_for('dashboard_medecin'))
+    
+    if "traitements" in dossier.Dossier:
+        if isinstance(dossier.Dossier["traitements"], list):
+            traitements_corriges = []
+            for t in dossier.Dossier["traitements"]:
+                if isinstance(t, str):  # Si c'est une chaîne mal formatée
+                    try:
+                        t = json.loads(t.replace("'", "\""))  # Remplacer ' par "
+                    except json.JSONDecodeError:
+                        print("⚠ Erreur de conversion JSON :", t)  # Debugging
+                        continue  # Ignorer ce traitement mal formé
+                traitements_corriges.append(t)
+            dossier.Dossier["traitements"] = traitements_corriges
+
+    if request.method == 'POST':
+        # Récupération des données du formulaire
+        historique = request.form.get('historique')
+        notes = request.form.get('notes')
+        noms = request.form.getlist('traitements_nom[]')
+        doses = request.form.getlist('traitements_dose[]')
+        frequences = request.form.getlist('traitements_frequence[]')
+
+        # Charger les données actuelles du dossier
+        dossier_data = dossier.Dossier.copy() if dossier.Dossier else {}
+
+        # Mise à jour des champs modifiables
+        if historique:
+            dossier_data["historique"] = historique
+        if notes:
+            dossier_data["notes"] = notes
+        traitements_uniques = set()
+        traitements_list = []
+
+        for nom, dose, freq in zip(noms, doses, frequences):
+            if nom in traitements_uniques:
+                flash(f"Le traitement '{nom}' est déjà ajouté. Supprimez le doublon.", "danger")
+                return redirect(url_for('modifier_dossier', patient_id=patient_id))
+            traitements_uniques.add(nom)
+            traitements_list.append({"nom": nom, "dose": dose, "frequence": freq})
+
+        # Mise à jour des traitements sans doublons
+        dossier_data["traitements"] = traitements_list
+
+
+
+        # Forcer la mise à jour de la colonne JSON
+        db.session.execute(
+            ProfilMedical.__table__.update()
+            .where(ProfilMedical.Patient_ID == patient_id)
+            .values(Dossier=dossier_data)
+        )
+        db.session.commit()
+
+
+        flash("Dossier médical mis à jour avec succès.", "success")
+        return redirect(url_for('dossier_medical', patient_id=patient_id))
+
+    print("Dossier to return",type(dossier.Dossier["traitements"][0]),dossier.Dossier["traitements"][0])
+    return render_template('medecin/modifier_dossier.html', dossier=dossier)
+
 
 @app.route('/associer_patient', methods=['GET', 'POST'], endpoint='associer_patient')
 @role_required('Médecin')
@@ -186,69 +310,6 @@ def historique_interactions():
 # ---------------------------------------------------------------------------- #
 #                                  Radiologue                                  #
 # ---------------------------------------------------------------------------- #
-
-@app.route('/dashboard_radiologue', endpoint='dashboard_radiologue')
-@login_required
-@role_required('Radiologue')
-def dashboard_radiologue():
-    # Récupérer les dossiers accessibles par le radiologue
-    accessible_dossiers = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User).all()
-    dossiers = []
-    for acces in accessible_dossiers:
-        dossier = ProfilMedical.query.filter_by(ID_Dossier=acces.ID_Acces).first()
-        if dossier:
-            dossiers.append(dossier)
-    return render_template('rediologue/dashboard_radiologue.html', dossiers=dossiers)
-
-@app.route('/ajouter_rapport/<int:dossier_id>', methods=['POST'], endpoint='ajouter_rapport')
-@login_required
-@role_required('Radiologue')
-def ajouter_rapport(dossier_id):
-    # Ajouter un rapport d'imagerie à un dossier médical
-    rapport = request.form.get('rapport')
-    if rapport:
-        dossier = ProfilMedical.query.get(dossier_id)
-        if dossier:
-            # Supposons que le dossier est un JSON, nous ajoutons le rapport à une clé "rapports"
-            if 'rapports' not in dossier.Dossier:
-                dossier.Dossier['rapports'] = []
-            dossier.Dossier['rapports'].append({
-                'date': datetime.now().strftime('%Y-%m-%d'),
-                'contenu': rapport
-            })
-            db.session.commit()
-            flash("Rapport ajouté avec succès.", "success")
-        else:
-            flash("Dossier non trouvé.", "danger")
-    else:
-        flash("Aucun rapport fourni.", "warning")
-
-    return redirect(url_for('dashboard_radiologue'))
-
-@app.route('/laisser_note/<int:dossier_id>', methods=['POST'], endpoint='laisser_note')
-@login_required
-@role_required('Radiologue')
-def laisser_note(dossier_id):
-    # Laisser une note ou un avis sur un dossier médical
-    note = request.form.get('note')
-    if note:
-        dossier = ProfilMedical.query.get(dossier_id)
-        if dossier:
-            # Supposons que le dossier est un JSON, nous ajoutons la note à une clé "notes"
-            if 'notes' not in dossier.Dossier:
-                dossier.Dossier['notes'] = []
-            dossier.Dossier['notes'].append({
-                'date': datetime.now().strftime('%Y-%m-%d'),
-                'contenu': note
-            })
-            db.session.commit()
-            flash("Note ajoutée avec succès.", "success")
-        else:
-            flash("Dossier non trouvé.", "danger")
-    else:
-        flash("Aucune note fournie.", "warning")
-
-    return redirect(url_for('dashboard_radiologue'))
 
 if __name__ == '__main__':
     with app.app_context():

@@ -17,26 +17,66 @@
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 p-8">
-        <h2 class="text-xl font-semibold mb-4 text-gray-700">Patients Actifs</h2>
+    <main class="flex-1 p-8 space-y-8">
+        <!-- Patients Actifs -->
+        <section>
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Patients Actifs</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <ul class="divide-y divide-gray-200">
+                    {% for patient in patients_actifs %}
+                        <li class="py-4 flex justify-between items-center">
+                            <div>
+                                <p class="text-lg font-medium text-gray-800">
+                                    {{ patient.nom }} {{ patient.prenom }} (ID: {{ patient.ID_User }})
+                                </p>
+                            </div>
+                            <a href="{{ url_for('dossier_medical', patient_id=patient.ID_User) }}"
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Voir Dossier</a>
+                        </li>
+                    {% else %}
+                        <li class="py-4 text-gray-500">Aucun patient actif.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
 
-        <!-- Patients List -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <ul class="divide-y divide-gray-200">
-                {% for patient in patients_actifs %}
-                    <li class="py-4 flex justify-between items-center">
-                        <div>
-                            <p class="text-lg font-medium text-gray-800">Patient ID: {{ patient.patient_ID }}</p>
-                            <p class="text-sm text-gray-500">Du {{ patient.date_debut }} au {{ patient.date_fin }}</p>
-                        </div>
-                        <a href="/dossier_medical/{{ patient.patient_ID }}"
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Voir Dossier</a>
-                    </li>
-                {% else %}
-                    <li class="py-4 text-gray-500">Aucun patient actif.</li>
-                {% endfor %}
-            </ul>
-        </div>
+        <!-- Radiologues -->
+        <section>
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Radiologues</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <ul class="divide-y divide-gray-200">
+                    {% for radiologue in radiologues %}
+                        <li class="py-4 flex justify-between items-center">
+                            <p class="text-lg font-medium text-gray-800">
+                                {{ radiologue.nom }} {{ radiologue.prenom }} (ID: {{ radiologue.ID_User }})
+                            </p>
+                            <span class="text-gray-500 text-sm">{{ radiologue.email }}</span>
+                        </li>
+                    {% else %}
+                        <li class="py-4 text-gray-500">Aucun radiologue disponible.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
+
+        <!-- Laborantins -->
+        <section>
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Laborantins</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <ul class="divide-y divide-gray-200">
+                    {% for laborantin in laborantins %}
+                        <li class="py-4 flex justify-between items-center">
+                            <p class="text-lg font-medium text-gray-800">
+                                {{ laborantin.nom }} {{ laborantin.prenom }} (ID: {{ laborantin.ID_User }})
+                            </p>
+                            <span class="text-gray-500 text-sm">{{ laborantin.email }}</span>
+                        </li>
+                    {% else %}
+                        <li class="py-4 text-gray-500">Aucun laborantin disponible.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->

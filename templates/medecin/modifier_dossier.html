@@ -1,133 +1,182 @@
 <!DOCTYPE html>
 <html lang="fr">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modifier le Dossier Médical</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
+  </head>
 
-<body class="bg-gray-100 min-h-screen flex flex-col">
+  <body class="bg-gray-100 min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-600">Modifier le Dossier Médical</h1>
-        <a href="{{ url_for('dossier_medical', patient_id=dossier.Patient_ID) }}"
-            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dossier</a>
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">
+        Modifier le Dossier Médical
+      </h1>
+      <div>
+        <a
+          href="{{ url_for('dossier_medical', dossier_id=dossier.ID_Dossier) }}"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300"
+          >Retour au Dossier</a
+        >
+      </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-1 p-8">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Mise à jour du dossier</h2>
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">
+          Mise à jour du dossier
+        </h2>
 
-            <!-- Messages flash -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="p-3 mb-4 text-white bg-{{ 'red' if category == 'danger' else 'blue' }}-600 rounded">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <form method="POST" action="{{ url_for('modifier_dossier', patient_id=dossier.Patient_ID) }}">
-                <!-- Historique Médical -->
-                <div class="mb-4">
-                    <label for="historique" class="block text-gray-700 font-medium">Historique Médical</label>
-                    <textarea id="historique" name="historique"
-                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ dossier.Dossier.historique if 'historique' in dossier.Dossier else '' }}</textarea>
-                </div>
-
-                <!-- Notes Médicales -->
-                <div class="mb-4">
-                    <label for="notes" class="block text-gray-700 font-medium">Notes Médicales</label>
-                    <textarea id="notes" name="notes"
-                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ dossier.Dossier.notes if 'notes' in dossier.Dossier else '' }}</textarea>
-                </div>
-
-                <!-- Traitements -->
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium">Traitements</label>
-                    <div id="traitements-list">
-                        {% if 'traitements' in dossier.Dossier %}
-                            {% for traitement in dossier.Dossier.traitements %}
-                                <div class="flex gap-2 mb-2 items-center traitement-item">
-                                    <input type="text" name="traitements_nom[]" value="{{ traitement.nom }}" placeholder="Nom"
-                                        class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <input type="text" name="traitements_dose[]" value="{{ traitement.dose }}" placeholder="Dose"
-                                        class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <input type="text" name="traitements_frequence[]" value="{{ traitement.frequence }}" placeholder="Fréquence"
-                                        class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <button type="button" class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition supprimer-traitement">🗑</button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                    <button type="button" onclick="ajouterTraitement()"
-                        class="bg-blue-500 text-white px-3 py-2 rounded mt-2">+ Ajouter un traitement</button>
-                </div>
-
-                <!-- Bouton de soumission -->
-                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-300">
-                    Enregistrer les modifications
-                </button>
-            </form>
+        <!-- Messages flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %} {% if
+        messages %} {% for category, message in messages %}
+        <div
+          class="p-3 mb-4 text-white bg-{{ 'red' if category == 'danger' else 'blue' }}-600 rounded"
+        >
+          {{ message }}
         </div>
+        {% endfor %} {% endif %} {% endwith %}
+
+        <form
+          method="POST"
+          action="{{ url_for('modifier_dossier', dossier_id=dossier.ID_Dossier) }}"
+        >
+          <!-- Historique Médical -->
+          <div class="mb-4">
+            <label for="historique" class="block text-gray-700 font-medium"
+              >Historique Médical</label
+            >
+            <textarea
+              id="historique"
+              name="historique"
+              class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+{{ dossier.Dossier.historique if 'historique' in dossier.Dossier else '' }}</textarea
+            >
+          </div>
+
+          <!-- Notes Médicales -->
+          <div class="mb-4">
+            <label for="notes" class="block text-gray-700 font-medium"
+              >Notes Médicales</label
+            >
+            <textarea
+              id="notes"
+              name="notes"
+              class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+{{ dossier.Dossier.notes if 'notes' in dossier.Dossier else '' }}</textarea
+            >
+          </div>
+
+          <!-- Traitements -->
+          <div class="mb-4">
+            <label class="block text-gray-700 font-medium">Traitements</label>
+            <div id="traitements-list">
+              {% if 'traitements' in dossier.Dossier %} {% for traitement in
+              dossier.Dossier.traitements %}
+              <div class="flex gap-2 mb-2 items-center traitement-item">
+                <input
+                  type="text"
+                  name="traitements_nom[]"
+                  value="{{ traitement.nom }}"
+                  placeholder="Nom"
+                  class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  name="traitements_dose[]"
+                  value="{{ traitement.dose }}"
+                  placeholder="Dose"
+                  class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  name="traitements_frequence[]"
+                  value="{{ traitement.frequence }}"
+                  placeholder="Fréquence"
+                  class="w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition supprimer-traitement"
+                >
+                  🗑
+                </button>
+              </div>
+              {% endfor %} {% endif %}
+            </div>
+            <button
+              type="button"
+              onclick="ajouterTraitement()"
+              class="bg-blue-500 text-white px-3 py-2 rounded mt-2"
+            >
+              + Ajouter un traitement
+            </button>
+          </div>
+
+          <!-- Bouton de soumission -->
+          <button
+            type="submit"
+            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-300"
+          >
+            Enregistrer les modifications
+          </button>
+        </form>
+      </div>
     </main>
 
     <!-- Footer -->
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
-        &copy; 2025 MediCrypt. Tous droits réservés.
+      &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
 
     <!-- Script pour ajouter et supprimer dynamiquement des traitements -->
     <script>
-        function ajouterTraitement() {
-            let div = document.createElement("div");
-            div.className = "flex gap-2 mb-2 items-center traitement-item";
-            
-            let inputNom = document.createElement("input");
-            inputNom.type = "text";
-            inputNom.name = "traitements_nom[]";
-            inputNom.placeholder = "Nom";
-            inputNom.className = "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
+      function ajouterTraitement() {
+        let div = document.createElement("div");
+        div.className = "flex gap-2 mb-2 items-center traitement-item";
 
-            let inputDose = document.createElement("input");
-            inputDose.type = "text";
-            inputDose.name = "traitements_dose[]";
-            inputDose.placeholder = "Dose";
-            inputDose.className = "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
+        let inputNom = document.createElement("input");
+        inputNom.type = "text";
+        inputNom.name = "traitements_nom[]";
+        inputNom.placeholder = "Nom";
+        inputNom.className =
+          "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-            let inputFrequence = document.createElement("input");
-            inputFrequence.type = "text";
-            inputFrequence.name = "traitements_frequence[]";
-            inputFrequence.placeholder = "Fréquence";
-            inputFrequence.className = "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
+        let inputDose = document.createElement("input");
+        inputDose.type = "text";
+        inputDose.name = "traitements_dose[]";
+        inputDose.placeholder = "Dose";
+        inputDose.className =
+          "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-            let boutonSupprimer = document.createElement("button");
-            boutonSupprimer.type = "button";
-            boutonSupprimer.className = "bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition supprimer-traitement";
-            boutonSupprimer.innerHTML = "🗑";
-            boutonSupprimer.onclick = function() {
-                div.remove();
-            };
+        let inputFrequence = document.createElement("input");
+        inputFrequence.type = "text";
+        inputFrequence.name = "traitements_frequence[]";
+        inputFrequence.placeholder = "Fréquence";
+        inputFrequence.className =
+          "w-1/4 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-            div.appendChild(inputNom);
-            div.appendChild(inputDose);
-            div.appendChild(inputFrequence);
-            div.appendChild(boutonSupprimer);
-            document.getElementById("traitements-list").appendChild(div);
-        }
+        let boutonSupprimer = document.createElement("button");
+        boutonSupprimer.type = "button";
+        boutonSupprimer.className =
+          "bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition supprimer-traitement";
+        boutonSupprimer.innerHTML = "🗑";
+        boutonSupprimer.onclick = function () {
+          div.remove();
+        };
 
-        // Suppression dynamique des traitements existants
-        document.querySelectorAll(".supprimer-traitement").forEach(button => {
-            button.addEventListener("click", function() {
-                this.parentElement.remove();
-            });
-        });
+        div.appendChild(inputNom);
+        div.appendChild(inputDose);
+        div.appendChild(inputFrequence);
+        div.appendChild(boutonSupprimer);
+        document.getElementById("traitements-list").appendChild(div);
+      }
     </script>
-</body>
-
+  </body>
 </html>

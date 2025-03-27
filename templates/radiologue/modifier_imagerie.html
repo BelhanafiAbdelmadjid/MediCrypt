@@ -1,71 +1,136 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modifier un Rapport d'Imagerie</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+  </head>
 
-    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-600">Modifier un Rapport d'Imagerie</h1>
-        <a href="{{ url_for('dossier_medical_radiologue', patient_id=patient_id) }}" 
-            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dossier</a>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">
+        Modifier un Rapport d'Imagerie
+      </h1>
+      <a
+        href="{{ url_for('dossier_medical_radiologue', dossier_id=dossier_id) }}"
+        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+      >
+        Retour au Dossier
+      </a>
     </header>
 
     <!-- Flash Messages -->
     <div class="p-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="p-3 mb-4 text-white rounded 
-                        {% if category == 'success' %}bg-green-500{% elif category == 'danger' %}bg-red-500{% else %}bg-blue-500{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %} {% for category, message in messages %}
+      <div
+        class="p-3 mb-4 text-white rounded {% if category == 'success' %}bg-green-500{% elif category == 'danger' %}bg-red-500{% else %}bg-blue-500{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %} {% endif %} {% endwith %}
     </div>
 
-    <main class="flex-1 p-8">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Modifier Rapport</h2>
+    <main class="flex-1 p-8 flex justify-center items-center">
+      <div class="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700 text-center">
+          Modifier Rapport
+        </h2>
 
-            <form method="POST">
-                <div class="mb-4">
-                    <label for="type" class="block text-gray-700 font-medium">Type d'Imagerie</label>
-                    <input type="text" id="type" name="type" required value="{{ rapport.type }}"
-                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
+        <form
+          method="POST"
+          action="{{ url_for('modifier_imagerie', dossier_id=dossier_id, index=index) }}"
+          enctype="multipart/form-data"
+          class="space-y-4"
+        >
+          <!-- Type d'Imagerie -->
+          <div>
+            <label for="type" class="block text-gray-700 font-medium"
+              >Type d'Imagerie</label
+            >
+            <input
+              type="text"
+              id="type"
+              name="type"
+              required
+              value="{{ rapport.type }}"
+              class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-                <div class="mb-4">
-                    <label for="resultat" class="block text-gray-700 font-medium">Résultat</label>
-                    <textarea id="resultat" name="resultat" required
-                        class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ rapport.résultat }}</textarea>
-                </div>
+          <!-- Résultat -->
+          <div>
+            <label for="resultat" class="block text-gray-700 font-medium"
+              >Résultat</label
+            >
+            <textarea
+              id="resultat"
+              name="resultat"
+              required
+              class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+{{ rapport.résultat }}</textarea
+            >
+          </div>
 
-                <div class="flex gap-4">
-                    <!-- Update Button -->
-                    <button type="submit" 
-                        class="flex-1 bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition duration-300">
-                        Modifier Rapport
-                    </button>
+          <!-- Image actuelle -->
+          <!-- {% if rapport.image_url %}
+          <div class="mb-4">
+            <p class="text-gray-700 font-medium">Image actuelle :</p>
+            <img
+              src="{{ url_for('static', filename='uploads/' + rapport.image_url) }}"
+              alt="Image du rapport"
+              class="w-full h-auto rounded-lg border border-gray-300 mt-2"
+            />
+          </div>
+          {% endif %} -->
 
-                    <!-- Delete Button -->
-                    <button type="submit" name="delete" 
-                        class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition duration-300"
-                        onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce rapport ? Cette action est irréversible.')">
-                        Supprimer Rapport
-                    </button>
-                </div>
-            </form>
-        </div>
+          <!-- Nouveau fichier -->
+          <!-- <div>
+            <label for="fichier" class="block text-gray-700 font-medium"
+              >Modifier ou ajouter une image</label
+            >
+            <input
+              type="file"
+              id="fichier"
+              name="fichier"
+              accept="image/*"
+              class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <p class="text-sm text-gray-500 mt-1">
+              Formats acceptés : JPG, PNG, JPEG.
+            </p>
+          </div> -->
+
+          <!-- Boutons -->
+          <div class="flex gap-4">
+            <!-- Update Button -->
+            <button
+              type="submit"
+              class="flex-1 bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition duration-300"
+            >
+              Modifier Rapport
+            </button>
+
+            <!-- Delete Button -->
+            <button
+              type="submit"
+              name="delete"
+              class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition duration-300"
+              onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce rapport ? Cette action est irréversible.')"
+            >
+              Supprimer Rapport
+            </button>
+          </div>
+        </form>
+      </div>
     </main>
 
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
-        &copy; 2025 MediCrypt. Tous droits réservés.
+      &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
-
-</body>
+  </body>
 </html>

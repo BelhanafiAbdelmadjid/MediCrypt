@@ -1,83 +1,129 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dossier Médical</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
-
-    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-600">Dossier Médical</h1>
-        <div class="flex gap-4">
-            {% if current_user.role == "Médecin" %}
-                <a href="{{ url_for('modifier_dossier', patient_id=dossier.Patient_ID) }}"
-                    class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">Modifier</a>
-                <a href="{{ url_for('gerer_acces', patient_id=dossier.Patient_ID) }}"
-                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Gérer Accès</a>
-            {% endif %}
-            <a href="{{ url_for('dashboard_medecin') }}"
-                class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dashboard</a>
-        </div>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">Dossier Médical</h1>
+      <div class="flex gap-4">
+        {% if current_user.role == "Médecin" %}
+        <a
+          href="{{ url_for('modifier_dossier', dossier_id=dossier.id_dossier) }}"
+          class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
+          >Modifier</a
+        >
+        <a
+          href="{{ url_for('gerer_acces', dossier_id=dossier.id_dossier) }}"
+          class="bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 transition"
+          >Gérer Accès</a
+        >
+        <a
+        href="{{ url_for('dashboard_medecin') }}"
+        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+      >
+        Retour au Dashboard
+      </a>
+        {% else %}
+        <a
+        href="javascript:history.back()"
+        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+        >Retour</a
+        >
+        {% endif %}
+      </div>
     </header>
 
     <main class="flex-1 p-8">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Détails du Dossier</h2>
-
-            {% if 'historique' in dossier %}
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-600">Historique :</h3>
-                <p class="bg-gray-50 p-4 rounded-lg text-gray-800 leading-relaxed">
-                    {{ dossier.historique }}
-                </p>
-            </div>
-            {% endif %}
-
-            {% if 'traitements' in dossier %}
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-600">Traitements :</h3>
-                <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
-                    {% for traitement in dossier.traitements %}
-                        <li><strong>{{ traitement.nom }}</strong> - {{ traitement.dose }} ({{ traitement.frequence }})</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-
-            {% if 'analyses' in dossier %}
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-600">Analyses :</h3>
-                <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
-                    {% for analyse in dossier.analyses %}
-                        <li>
-                            {{ analyse.type }} - {{ analyse.date }} : <strong>{{ analyse.valeur }}</strong><br>
-                            <span class="text-sm text-gray-500">Réalisé par : {{ analyse.laborantin_nom }} (ID: {{ analyse.laborantin_id }})</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-
-            {% if 'imagerie' in dossier %}
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-600">Rapports d'Imagerie :</h3>
-                <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
-                    {% for imagerie in dossier.imagerie %}
-                        <li>
-                            {{ imagerie.type }} - {{ imagerie.date }} : <strong>{{ imagerie.résultat }}</strong><br>
-                            <span class="text-sm text-gray-500">Réalisé par : {{ imagerie.radiologue_nom }} (ID: {{ imagerie.radiologue_id }})</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Détails du Dossier</h2>
+    
+        {% set has_data = False %}
+    
+        {% if 'historique' in dossier and dossier.historique %}
+        {% set has_data = True %}
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-600">Historique :</h3>
+          <p class="bg-gray-50 p-4 rounded-lg text-gray-800 leading-relaxed">
+            {{ dossier.historique }}
+          </p>
         </div>
+        {% endif %}
+        {% if 'notes' in dossier and dossier.historique %}
+        {% set has_data = True %}
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-600">Notes :</h3>
+          <p class="bg-gray-50 p-4 rounded-lg text-gray-800 leading-relaxed">
+            {{ dossier.notes }}
+          </p>
+        </div>
+        {% endif %}
+    
+        {% if 'traitements' in dossier and dossier.traitements %}
+        {% set has_data = True %}
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-600">Traitements :</h3>
+          <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
+            {% for traitement in dossier.traitements %}
+            <li>
+              <strong>{{ traitement.nom }}</strong> - {{ traitement.dose }} ({{
+              traitement.frequence }})
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+    
+        {% if 'analyses' in dossier and dossier.analyses %}
+        {% set has_data = True %}
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-600">Analyses :</h3>
+          <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
+            {% for analyse in dossier.analyses %}
+            <li>
+              {{ analyse.type }} - {{ analyse.date }} :
+              <strong>{{ analyse.valeur }}</strong><br />
+              <span class="text-sm text-gray-500">
+                Réalisé par : {{analyse.full_name}} (ID: {{ analyse.ajouté_par }})
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+    
+        {% if 'imagerie' in dossier and dossier.imagerie %}
+        {% set has_data = True %}
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-600">Rapports d'Imagerie :</h3>
+          <ul class="bg-gray-50 p-4 rounded-lg text-gray-800 list-disc list-inside">
+            {% for imagerie in dossier.imagerie %}
+            <li>
+              {{ imagerie.type }} - {{ imagerie.date }} :
+              <strong>{{ imagerie.résultat }}</strong><br />
+              <span class="text-sm text-gray-500">
+                Réalisé par : {{imagerie.full_name}} (ID: {{ imagerie.radiologue_id }})
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+    
+        {% if not has_data %}
+        <p class="text-gray-500 text-center py-4">Aucune information pour le moment.</p>
+        {% endif %}
+      </div>
     </main>
+    
 
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
-        &copy; 2025 MediCrypt. Tous droits réservés.
+      &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
-</body>
+  </body>
 </html>

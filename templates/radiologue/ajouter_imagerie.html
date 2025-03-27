@@ -1,36 +1,51 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ajouter un Rapport d'Imagerie</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
     <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-blue-600">Ajouter un Rapport d'Imagerie</h1>
-        <a href="{{ url_for('dossier_medical_radiologue', patient_id=patient_id) }}" 
-            class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dossier</a>
+        <a href="{{ url_for('dossier_medical_radiologue', dossier_id=dossier_id) }}" 
+            class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition">
+            Retour au Dossier
+        </a>
     </header>
 
-    <main class="flex-1 p-8">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Nouveau Rapport</h2>
+    <main class="flex-1 p-8 flex justify-center items-center">
+        <div class="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 text-center">Nouveau Rapport</h2>
 
-            <form method="POST">
-                <div class="mb-4">
+            <form method="POST" action="{{ url_for('ajouter_imagerie', dossier_id=dossier_id) }}" enctype="multipart/form-data" class="space-y-4">
+                <!-- Type d'Imagerie -->
+                <div>
                     <label for="type" class="block text-gray-700 font-medium">Type d'Imagerie</label>
                     <input type="text" id="type" name="type" required
                         class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
 
-                <div class="mb-4">
+                <!-- Résultat -->
+                <div>
                     <label for="resultat" class="block text-gray-700 font-medium">Résultat</label>
                     <textarea id="resultat" name="resultat" required
                         class="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
 
+                <!-- Fichier d'Imagerie -->
+                <!-- <div>
+                    <label for="fichier" class="block text-gray-700 font-medium">Joindre une image</label>
+                    <input type="file" id="fichier" name="fichier" accept="image/*" required
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">Formats acceptés : JPG, PNG, JPEG.</p>
+                </div> -->
+
+                <!-- Bouton de soumission -->
                 <button type="submit" 
                     class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-300">
                     Ajouter Rapport
@@ -44,4 +59,5 @@
     </footer>
 
 </body>
+
 </html>

@@ -1,76 +1,92 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dossier Médical - Radiologue</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+  </head>
 
-    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-600">Dossier Médical - Imagerie</h1>
-        <div class="flex gap-4">
-            <a href="{{ url_for('ajouter_imagerie', patient_id=patient_id) }}" 
-                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">+ Ajouter un Rapport</a>
-            <a href="{{ url_for('dashboard_radiologue') }}" 
-                class="text-gray-600 hover:text-gray-800 font-semibold transition duration-300">Retour au Dashboard</a>
-        </div>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">
+        Dossier Médical - Imagerie
+      </h1>
+      <div class="flex items-center gap-4">
+        <a
+          href="{{ url_for('ajouter_imagerie', dossier_id=dossier_id) }}"
+          class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+        >
+          + Ajouter un Rapport
+        </a>
+        <a
+          href="{{ url_for('dashboard_radiologue') }}"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+        >
+          Retour au Dashboard
+        </a>
+      </div>
     </header>
 
     <!-- Flash Messages -->
     <div class="p-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="p-3 mb-4 text-white rounded 
-                        {% if category == 'success' %}bg-green-500{% elif category == 'danger' %}bg-red-500{% else %}bg-blue-500{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %} {% for category, message in messages %}
+      <div
+        class="p-3 mb-4 text-white rounded {% if category == 'success' %}bg-green-500{% elif category == 'danger' %}bg-red-500{% else %}bg-blue-500{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %} {% endif %} {% endwith %}
     </div>
 
     <main class="flex-1 p-8">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Historique d'Imagerie</h2>
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">
+          Historique d'Imagerie
+        </h2>
 
-            {% if dossier %}
-                <ul class="divide-y divide-gray-200">
-                    {% for imagerie in dossier %}
-                        <li class="py-4 flex justify-between items-center">
-                            <div>
-                                <p class="text-lg font-medium text-gray-800">{{ imagerie.type }}</p>
-                                <p class="text-sm text-gray-500">Date: {{ imagerie.date }}</p>
-                                <p class="text-gray-700">Résultat: {{ imagerie.résultat }}</p>
+        {% if dossier %}
+        <ul class="divide-y divide-gray-200">
+          {% for imagerie in dossier %}
+          <li class="py-4 flex justify-between items-center">
+            <div>
+              <p class="text-lg font-medium text-gray-800">
+                {{ imagerie.type }}
+              </p>
+              <p class="text-sm text-gray-500">Date: {{ imagerie.date }}</p>
+              <p class="text-gray-700">Résultat: {{ imagerie.résultat }}</p>
 
-                                {% if imagerie.ajouté_par %}
-                                    {% with radiologue = Utilisateur.query.get(imagerie.ajouté_par) %}
-                                        {% if radiologue %}
-                                            <p class="text-sm text-gray-500">
-                                                Ajouté par : {{ radiologue.nom }} {{ radiologue.prenom }} (ID: {{ radiologue.ID_User }})
-                                            </p>
-                                        {% else %}
-                                            <p class="text-sm text-gray-500">Ajouté par : Utilisateur inconnu (ID: {{ imagerie.ajouté_par }})</p>
-                                        {% endif %}
-                                    {% endwith %}
-                                {% endif %}
-                            </div>
-                            <a href="{{ url_for('modifier_imagerie', patient_id=patient_id, index=loop.index0) }}" 
-                                class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">Modifier</a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-gray-500">Aucune imagerie disponible.</p>
-            {% endif %}
-        </div>
+              {% if imagerie.ajouté_par %} {% with radiologue =
+              Utilisateur.query.get(imagerie.ajouté_par) %} {% if radiologue %}
+              <p class="text-sm text-gray-500">
+                Ajouté par : {{ radiologue.nom }} {{ radiologue.prenom }} (ID:
+                {{ radiologue.ID_User }})
+              </p>
+              {% else %}
+              <p class="text-sm text-gray-500">
+                Ajouté par : Utilisateur inconnu (ID: {{ imagerie.ajouté_par }})
+              </p>
+              {% endif %} {% endwith %} {% endif %}
+            </div>
+            <a
+              href="{{ url_for('modifier_imagerie', dossier_id=dossier_id, index=loop.index0) }}"
+              class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
+              >Modifier</a
+            >
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500">Aucune imagerie disponible.</p>
+        {% endif %}
+      </div>
     </main>
 
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
-        &copy; 2025 MediCrypt. Tous droits réservés.
+      &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
-
-</body>
+  </body>
 </html>

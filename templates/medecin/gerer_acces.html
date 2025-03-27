@@ -1,95 +1,201 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gérer les Accès</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-5">
-        <h2 class="mb-4">Gérer les Accès</h2>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">Gérer les Accès</h1>
+      <div class="flex gap-4">
+        <a
+          href="{{ url_for('dashboard_medecin') }}"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+        >
+          Retour au Dashboard
+        </a>
+      </div>
+    </header>
 
-        <!-- Messages flash -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+    <main class="flex-1 p-8">
+      <!-- Messages flash -->
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %} {% for category, message in messages %}
+      <div
+        class="mb-4 p-4 rounded-lg {% if category == 'success' %}bg-green-100 text-green-700 {% elif category == 'error' %}bg-red-100 text-red-700 {% else %}bg-blue-100 text-blue-700{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %} {% endif %} {% endwith %}
+
+      <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">
+          Accorder un accès
+        </h2>
+
+        <form
+          method="POST"
+          action="{{ url_for('gerer_acces',dossier_id=dossier.ID_Dossier) }}"
+          class="space-y-4"
+        >
+          <input type="hidden" name="action" value="ajouter" />
+          <div>
+            <label for="utilisateur_id" class="block text-sm font-medium text-gray-700 mb-1">
+                Sélectionner un Professionnel
+            </label>
+            <select id="utilisateur_id" name="utilisateur_id" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <option value="" disabled selected>-- Choisir un professionnel --</option>
+                {% for professionnel in professionnels %}
+                    <option value="{{ professionnel.ID_User }}">
+                        {{ professionnel.role }} - {{ professionnel.nom }} {{ professionnel.prenom }}
+                    </option>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </select>
+        </div>
 
-        <!-- Formulaire d'ajout d'accès -->
-        <h4>Accorder un accès</h4>
-        <form method="POST" action="{{ url_for('gerer_acces') }}">
-            <input type="hidden" name="action" value="ajouter">
-            <div class="mb-3">
-                <label for="utilisateur_id" class="form-label">ID du Professionnel</label>
-                <input type="number" class="form-control" id="utilisateur_id" name="utilisateur_id" required>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label
+                for="date_debut"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Date de début</label
+              >
+              <input
+                type="date"
+                id="date_debut"
+                name="date_debut"
+                required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <div class="mb-3">
-                <label for="patient_id" class="form-label">ID du Patient</label>
-                <input type="number" class="form-control" id="patient_id" name="patient_id" required>
+
+            <div>
+              <label
+                for="date_fin"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Date de fin</label
+              >
+              <input
+                type="date"
+                id="date_fin"
+                name="date_fin"
+                required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <div class="mb-3">
-                <label for="role" class="form-label">Rôle</label>
-                <select class="form-control" id="role" name="role" required>
-                    <option value="Radiologue">Radiologue</option>
-                    <option value="Laborantin">Laborantin</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label for="date_debut" class="form-label">Date de début</label>
-                <input type="date" class="form-control" id="date_debut" name="date_debut" required>
-            </div>
-            <div class="mb-3">
-                <label for="date_fin" class="form-label">Date de fin</label>
-                <input type="date" class="form-control" id="date_fin" name="date_fin" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Accorder l'accès</button>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Accorder l'accès
+          </button>
         </form>
+      </div>
 
-        <!-- Liste des accès existants -->
-        <h4 class="mt-5">Accès existants</h4>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>ID Accès</th>
-                    <th>ID Professionnel</th>
-                    <th>Rôle</th>
-                    <th>ID Patient</th>
-                    <th>Date Début</th>
-                    <th>Date Fin</th>
-                    <th>Action</th>
-                </tr>
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">
+          Accès existants
+        </h2>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  ID Accès
+                </th>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  ID Professionnel
+                </th>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Rôle
+                </th>
+              
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Date Début
+                </th>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Date Fin
+                </th>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Action
+                </th>
+              </tr>
             </thead>
-            <tbody>
-                {% for acces in acces_existants %}
-                <tr>
-                    <td>{{ acces.ID_Acces }}</td>
-                    <td>{{ acces.Utilisateur_ID }}</td>
-                    <td>{{ acces.role }}</td>
-                    <td>{{ acces.Patient_ID }}</td>
-                    <td>{{ acces.date_debut.strftime('%Y-%m-%d') }}</td>
-                    <td>{{ acces.date_fin.strftime('%Y-%m-%d') }}</td>
-                    <td>
-                        <form method="POST" action="{{ url_for('gerer_acces') }}" style="display:inline;">
-                            <input type="hidden" name="action" value="supprimer">
-                            <input type="hidden" name="acces_id" value="{{ acces.ID_Acces }}">
-                            <button type="submit" class="btn btn-danger btn-sm">Révoquer</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for acces in acces_existants %}
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ acces.ID_Acces }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ acces.Utilisateur_ID }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ acces.role }}
+                </td>
+               
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ acces.date_debut.strftime('%Y-%m-%d') }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ acces.date_fin.strftime('%Y-%m-%d') }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <form
+                    method="POST"
+                    action="{{ url_for('gerer_acces',dossier_id=dossier.ID_Dossier) }}"
+                    class="inline"
+                  >
+                    <input type="hidden" name="action" value="supprimer" />
+                    <input
+                      type="hidden"
+                      name="acces_id"
+                      value="{{ acces.ID_Acces }}"
+                    />
+                    <button
+                      type="submit"
+                      class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition text-sm"
+                    >
+                      Révoquer
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
             </tbody>
-        </table>
+          </table>
+        </div>
+      </div>
+    </main>
 
-        <a href="{{ url_for('dashboard_medecin') }}" class="btn btn-secondary mt-3">Retour</a>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+    <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
+      &copy; 2025 MediCrypt. Tous droits réservés.
+    </footer>
+  </body>
 </html>

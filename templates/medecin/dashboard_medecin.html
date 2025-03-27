@@ -1,88 +1,110 @@
 <!DOCTYPE html>
 <html lang="fr">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Médecin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
+  </head>
 
-<body class="bg-gray-100 min-h-screen flex flex-col">
+  <body class="bg-gray-100 min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-600">Dashboard Médecin</h1>
-        <a href="{{ url_for('logout') }}"
-            class="text-red-500 hover:text-red-700 font-semibold transition duration-300">Déconnexion</a>
+    <header
+      class="bg-white shadow-md py-4 px-8 flex justify-between items-center"
+    >
+      <h1 class="text-2xl font-bold text-blue-600">Dashboard Médecin</h1>
+      <a
+        href="{{ url_for('logout') }}"
+        class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+        >Déconnexion</a
+      >
     </header>
 
     <!-- Main Content -->
     <main class="flex-1 p-8 space-y-8">
-        <!-- Patients Actifs -->
-        <section>
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Patients Actifs</h2>
-            <div class="bg-white rounded-lg shadow p-6">
-                <ul class="divide-y divide-gray-200">
-                    {% for patient in patients_actifs %}
-                        <li class="py-4 flex justify-between items-center">
-                            <div>
-                                <p class="text-lg font-medium text-gray-800">
-                                    {{ patient.nom }} {{ patient.prenom }} (ID: {{ patient.ID_User }})
-                                </p>
-                            </div>
-                            <a href="{{ url_for('dossier_medical', patient_id=patient.ID_User) }}"
-                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Voir Dossier</a>
-                        </li>
-                    {% else %}
-                        <li class="py-4 text-gray-500">Aucun patient actif.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </section>
+      <!-- Bouton pour associer un patient -->
 
-        <!-- Radiologues -->
-        <section>
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Radiologues</h2>
-            <div class="bg-white rounded-lg shadow p-6">
-                <ul class="divide-y divide-gray-200">
-                    {% for radiologue in radiologues %}
-                        <li class="py-4 flex justify-between items-center">
-                            <p class="text-lg font-medium text-gray-800">
-                                {{ radiologue.nom }} {{ radiologue.prenom }} (ID: {{ radiologue.ID_User }})
-                            </p>
-                            <span class="text-gray-500 text-sm">{{ radiologue.email }}</span>
-                        </li>
-                    {% else %}
-                        <li class="py-4 text-gray-500">Aucun radiologue disponible.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </section>
+      <!-- Patients Actifs -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">
+          Patients Actifs
+        </h2>
+        <div class="bg-white rounded-lg shadow p-6">
+          <ul class="divide-y divide-gray-200">
+            {% for patient in patients_actifs %}
+            <li class="py-4 flex justify-between items-center">
+              <div>
+                <p class="text-lg font-medium text-gray-800">
+                  {{ patient.nom }} {{ patient.prenom }} (ID: {{ patient.ID_User
+                  }})
+                </p>
+              </div>
+              <a
+                href="{{ url_for('liste_dossiers_patient', patient_id=patient.ID_User) }}"
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+              >
+                Voir Dossiers du patient
+              </a>
+            </li>
+            {% else %}
+            <li class="py-4 text-gray-500">Aucun patient actif.</li>
+            {% endfor %}
+          </ul>
+          <div class="flex justify-end">
+            <a
+              href="{{ url_for('associer_patient') }}"
+              class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition font-semibold"
+            >
+              Associer un Patient
+            </a>
+          </div>
+        </div>
+      </section>
 
-        <!-- Laborantins -->
-        <section>
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Laborantins</h2>
-            <div class="bg-white rounded-lg shadow p-6">
-                <ul class="divide-y divide-gray-200">
-                    {% for laborantin in laborantins %}
-                        <li class="py-4 flex justify-between items-center">
-                            <p class="text-lg font-medium text-gray-800">
-                                {{ laborantin.nom }} {{ laborantin.prenom }} (ID: {{ laborantin.ID_User }})
-                            </p>
-                            <span class="text-gray-500 text-sm">{{ laborantin.email }}</span>
-                        </li>
-                    {% else %}
-                        <li class="py-4 text-gray-500">Aucun laborantin disponible.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </section>
+      <!-- Radiologues -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Radiologues</h2>
+        <div class="bg-white rounded-lg shadow p-6">
+          <ul class="divide-y divide-gray-200">
+            {% for radiologue in radiologues %}
+            <li class="py-4 flex justify-between items-center">
+              <p class="text-lg font-medium text-gray-800">
+                {{ radiologue.nom }} {{ radiologue.prenom }} (ID: {{
+                radiologue.ID_User }})
+              </p>
+              <span class="text-gray-500 text-sm">{{ radiologue.email }}</span>
+            </li>
+            {% else %}
+            <li class="py-4 text-gray-500">Aucun radiologue disponible.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+
+      <!-- Laborantins -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Laborantins</h2>
+        <div class="bg-white rounded-lg shadow p-6">
+          <ul class="divide-y divide-gray-200">
+            {% for laborantin in laborantins %}
+            <li class="py-4 flex justify-between items-center">
+              <p class="text-lg font-medium text-gray-800">
+                {{ laborantin.nom }} {{ laborantin.prenom }} (ID: {{
+                laborantin.ID_User }})
+              </p>
+              <span class="text-gray-500 text-sm">{{ laborantin.email }}</span>
+            </li>
+            {% else %}
+            <li class="py-4 text-gray-500">Aucun laborantin disponible.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
     </main>
 
     <!-- Footer -->
     <footer class="bg-white shadow-md py-4 text-center text-sm text-gray-400">
-        &copy; 2025 MediCrypt. Tous droits réservés.
+      &copy; 2025 MediCrypt. Tous droits réservés.
     </footer>
-</body>
-
+  </body>
 </html>

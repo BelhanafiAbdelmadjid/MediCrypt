@@ -18,7 +18,7 @@ def seed_utilisateurs():
                     nom=fake.last_name(),
                     prenom=fake.first_name(),
                     email=fake.unique.email(),
-                    pwd='password',  # ⚠️ Changer en prod
+                    pwd='pass',  # ⚠️ Changer en prod
                     role=role
                 ))
 

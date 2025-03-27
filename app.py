@@ -55,6 +55,8 @@ def login():
                 return redirect(url_for('dashboard_radiologue'))
             elif user.role == 'Laborantin':
                 return redirect(url_for('dashboard_laborantin'))
+            else :
+                return redirect(url_for('dashboard_patient'))
             # return redirect(url_for('dashboard_medecin'))
         else:
             flash("Invalid credentials. Please try again.", "danger")
@@ -72,9 +74,17 @@ def logout():
 @role_required('Médecin')
 def dashboard_medecin():
     # Récupérer les patients actifs avec leurs informations
-    patients_actifs = db.session.query(Utilisateur).join(MedecinTraitant, Utilisateur.ID_User == MedecinTraitant.patient_ID) \
-                        .filter(MedecinTraitant.medecin_ID == current_user.ID_User, MedecinTraitant.actif == True).all()
-
+    patients_actifs = (
+        db.session.query(Utilisateur)
+        .join(MedecinTraitant, Utilisateur.ID_User == MedecinTraitant.patient_ID)
+        .join(ProfilMedical, ProfilMedical.traitant_ID == MedecinTraitant.ID)
+        .filter(
+            MedecinTraitant.medecin_ID == current_user.ID_User,
+            ProfilMedical.actif == True  # Vérifier si un dossier est actif
+        )
+        .distinct()  # Évite les doublons si plusieurs dossiers actifs existent
+        .all()
+    )
     # Récupérer les radiologues et laborantins
     radiologues = Utilisateur.query.filter_by(role="Radiologue").all()
     laborantins = Utilisateur.query.filter_by(role="Laborantin").all()
@@ -86,82 +96,198 @@ def dashboard_medecin():
         laborantins=laborantins
     )
 
-@app.route('/dossier_medical/<int:patient_id>', endpoint='dossier_medical')
+@app.route('/patient/<int:patient_id>/dossiers', endpoint='liste_dossiers_patient')
 @login_required
-def dossier_medical(patient_id):
-    # Verify if the dossier exists
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
-    if not dossier:
-        flash("Dossier médical introuvable.", "danger")
+def liste_dossiers_patient(patient_id):
+    # Vérifier si l'utilisateur est un médecin
+    if current_user.role != "Médecin":
+        flash("Accès refusé.", "danger")
         return redirect(url_for('dashboard_medecin'))
 
-    # Verify user permissions
+    # Vérifier si le médecin est bien le médecin traitant du patient
+    traitant = MedecinTraitant.query.filter_by(
+        medecin_ID=current_user.ID_User, patient_ID=patient_id
+    ).first()
+
+    if not traitant:
+        flash("Vous n'avez pas accès aux dossiers de ce patient.", "danger")
+        return redirect(url_for('dashboard_medecin'))
+
+    # Récupérer le patient
+    patient = Utilisateur.query.filter_by(ID_User=patient_id, role="Patient").first()
+    if not patient:
+        flash("Patient introuvable.", "danger")
+        return redirect(url_for('dashboard_medecin'))
+
+    # Récupérer les dossiers médicaux du patient associés à ce médecin
+    dossiers = (
+        ProfilMedical.query
+        .join(MedecinTraitant, ProfilMedical.traitant_ID == MedecinTraitant.ID)
+        .filter(
+            MedecinTraitant.medecin_ID == current_user.ID_User,
+            MedecinTraitant.patient_ID == patient_id
+        )
+        .all()
+    )
+
+    # Séparer les dossiers actifs et inactifs
+    dossiers_actifs = []
+    dossiers_inactifs = []
+
+    for dossier in dossiers:
+        dossier_info = {
+            "id_dossier": dossier.ID_Dossier,
+            "date_debut": dossier.date_debut,
+            "date_fin": dossier.date_fin,
+            "nom_medecin": f"{current_user.nom} {current_user.prenom}",
+            "patient_info": {
+                "id": patient.ID_User,
+                "nom": patient.nom,
+                "prenom": patient.prenom,
+                "email": patient.email
+            }
+        }
+
+        if dossier.actif:
+            dossiers_actifs.append(dossier_info)
+        else:
+            dossiers_inactifs.append(dossier_info)
+
+    return render_template(
+        'medecin/liste_dossiers.html',
+        dossiers_actifs=dossiers_actifs,
+        dossiers_inactifs=dossiers_inactifs,
+        patient=patient
+    )
+
+
+@app.route('/dossier_medical/<int:dossier_id>', endpoint='dossier_medical')
+@login_required
+def dossier_medical(dossier_id):
+    # Récupérer le dossier médical
+    dossier = ProfilMedical.query.get_or_404(dossier_id)
+
+    # Trouver le médecin traitant et le patient
+    medecin_traitant = dossier.traitant
+    if not medecin_traitant:
+        flash("Dossier médical corrompu (pas de médecin traitant).", "danger")
+        return redirect(url_for('home'))
+
+    patient_id = medecin_traitant.patient_ID
+    patient = Utilisateur.query.get(patient_id)
+
+    # Vérification des accès
     if current_user.role == "Médecin":
-        est_medecin_du_patient = MedecinTraitant.query.filter_by(
-            medecin_ID=current_user.ID_User, patient_ID=patient_id
-        ).first()
-        if not est_medecin_du_patient:
-            flash("Vous n'avez pas accès à ce dossier.", "danger")
+        if current_user.ID_User != medecin_traitant.medecin_ID:
+            flash("Vous n'êtes pas le médecin traitant de ce dossier.", "danger")
             return redirect(url_for('dashboard_medecin'))
-        donnees_dossier = dossier.Dossier  # The doctor sees everything
+        acces_complet = True
 
-    elif current_user.role in ["Radiologue", "Laborantin"]:
-        acces_autorise = Acces.query.filter_by(
-            Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id
-        ).first()
-        if not acces_autorise:
-            flash("Vous n'avez pas accès à ce dossier.", "danger")
+    elif current_user.role == "Patient":
+        if current_user.ID_User != patient_id:
+            flash("Vous ne pouvez accéder qu'à votre propre dossier.", "danger")
+            return redirect(url_for('home'))
+        acces_complet = True
+
+    elif current_user.role == "Radiologue":
+        # Vérifier si le radiologue a réalisé des imageries pour ce patient
+        imageries_autorisees = [
+            imagerie for imagerie in dossier.Dossier.get("imagerie", [])
+            if imagerie.get("ajouté_par") == current_user.ID_User
+        ]
+        if not imageries_autorisees:
+            flash("Vous n'avez pas d'imageries autorisées pour ce dossier.", "danger")
             return redirect(url_for('dashboard_medecin'))
+        acces_complet = False
 
-        if current_user.role == "Laborantin":
-            donnees_dossier = {"analyses": dossier.Dossier.get("analyses", [])}
-        elif current_user.role == "Radiologue":
-            donnees_dossier = {"imagerie": dossier.Dossier.get("imagerie", [])}
+    elif current_user.role == "Laborantin":
+        # Vérifier si le laborantin a réalisé des analyses pour ce patient
+        analyses_autorisees = [
+            analyse for analyse in dossier.Dossier.get("analyses", [])
+            if analyse.get("ajouté_par") == current_user.ID_User
+        ]
+        if not analyses_autorisees:
+            flash("Vous n'avez pas d'analyses autorisées pour ce dossier.", "danger")
+            return redirect(url_for('dashboard_medecin'))
+        acces_complet = False
 
     else:
         flash("Accès refusé.", "danger")
         return redirect(url_for('home'))
 
-    donnees_dossier["Patient_ID"] = patient_id
+    # Construire les données à afficher
+    donnees_dossier = {
+        "id_dossier": dossier.ID_Dossier,
+        "Patient_ID": patient_id,
+        "patient_nom": patient.nom,
+        "patient_prenom": patient.prenom,
+    }
 
-    # 🔹 **Attach User Info to Imaging Reports & Analyses**
-    for imagerie in donnees_dossier.get("imagerie", []):
-        if "ajouté_par" in imagerie:
-            user = Utilisateur.query.get(imagerie["ajouté_par"])
-            imagerie["radiologue_nom"] = f"{user.nom} {user.prenom}" if user else "Utilisateur inconnu"
-            imagerie["radiologue_id"] = user.ID_User if user else "N/A"
+    if acces_complet:
+        dossier_data = dossier.Dossier if isinstance(dossier.Dossier, dict) else {}
 
-    for analyse in donnees_dossier.get("analyses", []):
-        if "ajouté_par" in analyse:
-            user = Utilisateur.query.get(analyse["ajouté_par"])
-            analyse["laborantin_nom"] = f"{user.nom} {user.prenom}" if user else "Utilisateur inconnu"
-            analyse["laborantin_id"] = user.ID_User if user else "N/A"
+        # Enrichir la section Analyses et Radiologies avec les informations de "ajouté_par"
+        for analyse in dossier_data.get("analyses", []):
+            utilisateur = Utilisateur.query.get(analyse.get("ajouté_par"))
+            if utilisateur:
+                analyse["full_name"] = utilisateur.nom + " " + utilisateur.prenom
+            else:
+                analyse["full_name"] = "Utilisateur inconnu"
+
+        for imagerie in dossier_data.get("imagerie", []):
+            utilisateur = Utilisateur.query.get(imagerie.get("ajouté_par"))
+            if utilisateur:
+                imagerie["full_name"] = utilisateur.nom + " " + utilisateur.prenom
+            else:
+                imagerie["full_name"] = "Utilisateur inconnu"
+
+        # Maintenant on met à jour donnees_dossier avec les infos modifiées
+        donnees_dossier.update({
+            "date_debut": dossier.date_debut,
+            "date_fin": dossier.date_fin,
+            "actif": dossier.actif,
+            **dossier_data  # On ajoute ici les données enrichies
+        })
+
+        donnees_dossier["medecin_traitant"] = {
+            "id": medecin_traitant.medecin_ID,
+            "nom": medecin_traitant.medecin.nom,
+            "prenom": medecin_traitant.medecin.prenom,
+        }
+    else:
+        # Accès limité pour Radiologue & Laborantin
+        donnees_dossier["contenu"] = {}
+
+        if current_user.role == "Radiologue":
+            donnees_dossier["contenu"]["imagerie"] = imageries_autorisees
+
+        if current_user.role == "Laborantin":
+            donnees_dossier["contenu"]["analyses"] = analyses_autorisees
 
     return render_template('medecin/dossier_medical.html', dossier=donnees_dossier)
 
-
-@app.route('/modifier_dossier/<int:patient_id>', methods=['GET', 'POST'], endpoint='modifier_dossier')
+@app.route('/modifier_dossier/<int:dossier_id>', methods=['GET', 'POST'], endpoint='modifier_dossier')
 @role_required('Médecin')
-def modifier_dossier(patient_id):
-    # Vérifier si le dossier médical du patient existe
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+def modifier_dossier(dossier_id):
+    # Vérifier si le dossier médical existe
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_medecin'))
 
-    # Vérifier que le médecin a bien ce patient sous sa responsabilité
-    relation = MedecinTraitant.query.filter_by(medecin_ID=current_user.ID_User, patient_ID=patient_id).first()
-    if not relation:
+    # Vérifier que le médecin connecté est bien le médecin traitant du dossier
+    if not dossier.traitant or dossier.traitant.medecin_ID != current_user.ID_User:
         flash("Vous n'êtes pas autorisé à modifier ce dossier.", "danger")
         return redirect(url_for('dashboard_medecin'))
-    
+
+    # Correction des traitements mal formatés (si nécessaire)
     if "traitements" in dossier.Dossier:
         if isinstance(dossier.Dossier["traitements"], list):
             traitements_corriges = []
             for t in dossier.Dossier["traitements"]:
                 if isinstance(t, str):  # Si c'est une chaîne mal formatée
                     try:
-                        t = json.loads(t.replace("'", "\""))  # Remplacer ' par "
+                        t = json.loads(t.replace("'", "\""))  # Remplacement des apostrophes simples
                     except json.JSONDecodeError:
                         print("⚠ Erreur de conversion JSON :", t)  # Debugging
                         continue  # Ignorer ce traitement mal formé
@@ -184,35 +310,31 @@ def modifier_dossier(patient_id):
             dossier_data["historique"] = historique
         if notes:
             dossier_data["notes"] = notes
+
+        # Vérification des doublons et mise à jour des traitements
         traitements_uniques = set()
         traitements_list = []
-
         for nom, dose, freq in zip(noms, doses, frequences):
             if nom in traitements_uniques:
                 flash(f"Le traitement '{nom}' est déjà ajouté. Supprimez le doublon.", "danger")
-                return redirect(url_for('modifier_dossier', patient_id=patient_id))
+                return redirect(url_for('modifier_dossier', dossier_id=dossier_id))
             traitements_uniques.add(nom)
             traitements_list.append({"nom": nom, "dose": dose, "frequence": freq})
 
-        # Mise à jour des traitements sans doublons
-        dossier_data["traitements"] = traitements_list
+        dossier_data["traitements"] = traitements_list  # Mise à jour des traitements sans doublons
 
-
-
-        # Forcer la mise à jour de la colonne JSON
+        # Mise à jour du dossier médical dans la base de données
         db.session.execute(
             ProfilMedical.__table__.update()
-            .where(ProfilMedical.Patient_ID == patient_id)
+            .where(ProfilMedical.ID_Dossier == dossier_id)
             .values(Dossier=dossier_data)
         )
         db.session.commit()
 
-
         flash("Dossier médical mis à jour avec succès.", "success")
-        return redirect(url_for('dossier_medical', patient_id=patient_id))
+        return redirect(url_for('dossier_medical', dossier_id=dossier_id))
 
     return render_template('medecin/modifier_dossier.html', dossier=dossier)
-
 
 @app.route('/associer_patient', methods=['GET', 'POST'], endpoint='associer_patient')
 @role_required('Médecin')
@@ -239,12 +361,16 @@ def associer_patient():
         nouveau_traitant = MedecinTraitant(
             medecin_ID=current_user.ID_User,
             patient_ID=patient_id,
+        )
+        db.session.add(nouveau_traitant)
+        db.session.flush() 
+        nouveau_dossier =  ProfilMedical(
+            # Patient_ID=patient_id,
+            # medecin_ID=current_user.ID_User,
+            traitant_ID = nouveau_traitant.ID,
             actif=True,
             date_debut=date_debut,
-            date_fin=date_fin
-        )
-        nouveau_dossier =  ProfilMedical(
-            Patient_ID=patient_id,
+            date_fin=date_fin,
             Dossier={
                 "historique": "",
                 "traitements": [],
@@ -252,35 +378,36 @@ def associer_patient():
                 "analyses": []
             }
         )
-        db.session.add(nouveau_traitant)
         db.session.add(nouveau_dossier)
         db.session.commit()
         flash("Association du patient réussie.", "success")
         return redirect(url_for('dashboard_medecin'))
 
-    return render_template('medecin/associer_patient.html')
+    liste_patients = Utilisateur.query.filter_by(role='Patient').all()
 
-@app.route('/gerer_acces', methods=['GET', 'POST'], endpoint='gerer_acces')
+    return render_template('medecin/associer_patient.html',liste_patients=liste_patients)
+
+@app.route('/gerer_acces/<int:dossier_id>', methods=['GET', 'POST'], endpoint='gerer_acces')
 @role_required('Médecin')
-def gerer_acces():
+def gerer_acces(dossier_id):
     if request.method == 'POST':
         action = request.form.get('action')
 
         if action == 'ajouter':
             utilisateur_id = request.form['utilisateur_id']
-            patient_id = request.form['patient_id']
-            role = request.form['role']
+            # patient_id = request.form['patient_id']
+            # role = request.form['role']
             date_debut = datetime.strptime(request.form['date_debut'], '%Y-%m-%d')
             date_fin = datetime.strptime(request.form['date_fin'], '%Y-%m-%d')
 
             # Vérifier si l'utilisateur est bien un Radiologue ou un Laborantin
-            professionnel = Utilisateur.query.filter_by(ID_User=utilisateur_id, role=role).first()
+            professionnel = Utilisateur.query.filter_by(ID_User=utilisateur_id).first()
             if not professionnel:
                 flash("L'utilisateur sélectionné n'est pas un Radiologue ou un Laborantin.", "danger")
                 return redirect(url_for('gerer_acces'))
 
             # Vérifier si l'accès existe déjà
-            acces_existant = Acces.query.filter_by(Utilisateur_ID=utilisateur_id, Patient_ID=patient_id).first()
+            acces_existant = Acces.query.filter_by(Utilisateur_ID=utilisateur_id, ID_Dossier=dossier_id).first()
             if acces_existant:
                 flash("Cet utilisateur a déjà accès au dossier du patient.", "warning")
                 return redirect(url_for('gerer_acces'))
@@ -288,8 +415,8 @@ def gerer_acces():
             # Création d'un nouvel accès
             nouvel_acces = Acces(
                 Utilisateur_ID=utilisateur_id,
-                Patient_ID=patient_id,
-                role=role,
+                ID_Dossier=dossier_id,
+                role=professionnel.role,
                 date_debut=date_debut,
                 date_fin=date_fin
             )
@@ -307,14 +434,21 @@ def gerer_acces():
             else:
                 flash("Accès introuvable.", "danger")
 
-        return redirect(url_for('gerer_acces'))
+        return redirect(url_for('gerer_acces',dossier_id=dossier_id))
 
     # Récupérer les accès des patients du médecin
-    acces_existants = Acces.query.join(MedecinTraitant, Acces.Patient_ID == MedecinTraitant.patient_ID)\
-                                 .filter(MedecinTraitant.medecin_ID == current_user.ID_User)\
-                                 .all()
+    acces_existants = Acces.query.join(ProfilMedical, Acces.ID_Dossier == dossier_id)\
+                             .join(MedecinTraitant, ProfilMedical.traitant_ID == MedecinTraitant.ID)\
+                             .filter(MedecinTraitant.medecin_ID == current_user.ID_User)\
+                             .all()
+    professionnels = Utilisateur.query.filter(
+        Utilisateur.role.in_(['Radiologue', 'Laborantin'])
+    ).all()
 
-    return render_template('medecin/gerer_acces.html', acces_existants=acces_existants)
+    return render_template('medecin/gerer_acces.html', 
+                           acces_existants=acces_existants,
+                           dossier={"ID_Dossier":dossier_id},
+                           professionnels=professionnels)
 
 @app.route('/historique_interactions', endpoint='historique_interactions')
 @role_required('Médecin')
@@ -337,40 +471,43 @@ def historique_interactions():
 def dashboard_radiologue():
     # Récupérer les dossiers accessibles pour ce radiologue via la table Acces
     dossiers = db.session.query(ProfilMedical, Utilisateur) \
-        .join(Utilisateur, ProfilMedical.Patient_ID == Utilisateur.ID_User) \
-        .join(Acces, ProfilMedical.Patient_ID == Acces.Patient_ID) \
+        .join(Acces, ProfilMedical.ID_Dossier == Acces.ID_Dossier) \
+        .join(MedecinTraitant, ProfilMedical.traitant_ID == MedecinTraitant.ID) \
+        .join(Utilisateur, MedecinTraitant.patient_ID == Utilisateur.ID_User) \
         .filter(Acces.Utilisateur_ID == current_user.ID_User, Acces.role == 'Radiologue') \
         .all()
 
     return render_template('radiologue/dashboard_radiologue.html', dossiers=dossiers)
-@app.route('/dossier_medical_radiologue/<int:patient_id>', endpoint='dossier_medical_radiologue')
+
+@app.route('/dossier_medical_radiologue/<int:dossier_id>', endpoint='dossier_medical_radiologue')
 @role_required('Radiologue')
-def dossier_medical_radiologue(patient_id):
-    # Check if the radiologist has access
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Radiologue').first()
+def dossier_medical_radiologue(dossier_id):
+    # Vérifier si le radiologue a accès au dossier médical
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_radiologue'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    # Récupérer le dossier médical
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_radiologue'))
 
-    # The radiologist only sees "imagerie"
+    # Le radiologue ne voit que la partie "imagerie"
     imagerie = dossier.Dossier.get("imagerie", [])
 
-    return render_template('radiologue/dossier_medical_radiologue.html', dossier=imagerie, patient_id=patient_id, Utilisateur=Utilisateur)
-@app.route('/ajouter_imagerie/<int:patient_id>', methods=['GET', 'POST'], endpoint='ajouter_imagerie')
+    return render_template('radiologue/dossier_medical_radiologue.html', dossier=imagerie, dossier_id=dossier_id, Utilisateur=Utilisateur)
+@app.route('/ajouter_imagerie/<int:dossier_id>', methods=['GET', 'POST'], endpoint='ajouter_imagerie')
 @role_required('Radiologue')
-def ajouter_imagerie(patient_id):
+def ajouter_imagerie(dossier_id):
     # Vérifier si l'accès est autorisé
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Radiologue').first()
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_radiologue'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_radiologue'))
@@ -398,29 +535,29 @@ def ajouter_imagerie(patient_id):
         # 🔥 **Mise à jour forcée de la colonne JSON**
         db.session.execute(
             ProfilMedical.__table__.update()
-            .where(ProfilMedical.Patient_ID == patient_id)
+            .where(ProfilMedical.ID_Dossier == dossier_id)
             .values(Dossier=dossier_data)
         )
         db.session.commit()
 
         flash("Rapport d'imagerie ajouté avec succès.", "success")
-        return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
-    return render_template('radiologue/ajouter_imagerie.html', patient_id=patient_id)
+    return render_template('radiologue/ajouter_imagerie.html', dossier_id=dossier_id)
 
-@app.route('/modifier_imagerie/<int:patient_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_imagerie')
+@app.route('/modifier_imagerie/<int:dossier_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_imagerie')
 @role_required('Radiologue')
-def modifier_imagerie(patient_id, index):
+def modifier_imagerie(dossier_id, index):
     # Verify if the user has access to the patient's medical records
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Radiologue').first()
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_radiologue'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier or "imagerie" not in dossier.Dossier or index >= len(dossier.Dossier["imagerie"]):
         flash("Rapport d'imagerie introuvable.", "danger")
-        return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
     # Get the imaging report
     rapport = dossier.Dossier["imagerie"][index]
@@ -428,7 +565,7 @@ def modifier_imagerie(patient_id, index):
     # 🔹 **Check if the current user is the one who added the report**
     if "ajouté_par" not in rapport or rapport["ajouté_par"] != current_user.ID_User:
         flash("Vous ne pouvez modifier ou supprimer que les rapports que vous avez ajoutés.", "danger")
-        return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
     if request.method == 'POST':
         if 'delete' in request.form:  # Check if the delete button was pressed
@@ -438,13 +575,13 @@ def modifier_imagerie(patient_id, index):
             # 🔥 **Force updating the JSON column**
             db.session.execute(
                 ProfilMedical.__table__.update()
-                .where(ProfilMedical.Patient_ID == patient_id)
+                .where(ProfilMedical.ID_Dossier == dossier_id)
                 .values(Dossier=dossier_data)
             )
             db.session.commit()
 
             flash("Rapport d'imagerie supprimé avec succès.", "success")
-            return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
+            return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
         else:  # Update logic
             type_imagerie = request.form.get('type')
@@ -461,39 +598,44 @@ def modifier_imagerie(patient_id, index):
             # 🔥 **Force updating the JSON column**
             db.session.execute(
                 ProfilMedical.__table__.update()
-                .where(ProfilMedical.Patient_ID == patient_id)
+                .where(ProfilMedical.ID_Dossier == dossier_id)
                 .values(Dossier=dossier_data)
             )
             db.session.commit()
 
             flash("Rapport d'imagerie modifié avec succès.", "success")
-            return redirect(url_for('dossier_medical_radiologue', patient_id=patient_id))
+            return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
-    return render_template('radiologue/modifier_imagerie.html', patient_id=patient_id, rapport=rapport)
+    return render_template('radiologue/modifier_imagerie.html',
+                            dossier_id=dossier_id,
+                            rapport=rapport,
+                            index=index)
 
 # Laborantin 
 @app.route('/dashboard_laborantin', endpoint='dashboard_laborantin')
 @role_required('Laborantin')
 def dashboard_laborantin():
     # Retrieve accessible patient dossiers
+    
     dossiers = db.session.query(ProfilMedical, Utilisateur) \
-        .join(Utilisateur, ProfilMedical.Patient_ID == Utilisateur.ID_User) \
-        .join(Acces, ProfilMedical.Patient_ID == Acces.Patient_ID) \
+        .join(Acces, ProfilMedical.ID_Dossier == Acces.ID_Dossier) \
+        .join(MedecinTraitant, ProfilMedical.traitant_ID == MedecinTraitant.ID) \
+        .join(Utilisateur, MedecinTraitant.patient_ID == Utilisateur.ID_User) \
         .filter(Acces.Utilisateur_ID == current_user.ID_User, Acces.role == 'Laborantin') \
         .all()
 
     return render_template('laborantin/dashboard_laborantin.html', dossiers=dossiers)
 
-@app.route('/dossier_medical_laborantin/<int:patient_id>', endpoint='dossier_medical_laborantin')
+@app.route('/dossier_medical_laborantin/<int:dossier_id>', endpoint='dossier_medical_laborantin')
 @role_required('Laborantin')
-def dossier_medical_laborantin(patient_id):
+def dossier_medical_laborantin(dossier_id):
     # Check if the lab technician has access
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_laborantin'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_laborantin'))
@@ -501,18 +643,18 @@ def dossier_medical_laborantin(patient_id):
     # The lab technician only sees "analyses"
     analyses = dossier.Dossier.get("analyses", [])
 
-    return render_template('laborantin/dossier_medical_laborantin.html', dossier=analyses, patient_id=patient_id, Utilisateur=Utilisateur)
+    return render_template('laborantin/dossier_medical_laborantin.html', dossier=analyses, dossier_id=dossier_id, Utilisateur=Utilisateur)
 
-@app.route('/ajouter_analyse/<int:patient_id>', methods=['GET', 'POST'], endpoint='ajouter_analyse')
+@app.route('/ajouter_analyse/<int:dossier_id>', methods=['GET', 'POST'], endpoint='ajouter_analyse')
 @role_required('Laborantin')
-def ajouter_analyse(patient_id):
+def ajouter_analyse(dossier_id):
     # Verify if the lab technician has access
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_laborantin'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_laborantin'))
@@ -540,29 +682,29 @@ def ajouter_analyse(patient_id):
         # Force updating the JSON column
         db.session.execute(
             ProfilMedical.__table__.update()
-            .where(ProfilMedical.Patient_ID == patient_id)
+            .where(ProfilMedical.ID_Dossier == dossier_id)
             .values(Dossier=dossier_data)
         )
         db.session.commit()
 
         flash("Analyse ajoutée avec succès.", "success")
-        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
-    return render_template('laborantin/ajouter_analyse.html', patient_id=patient_id)
+    return render_template('laborantin/ajouter_analyse.html', dossier_id=dossier_id)
 
-@app.route('/modifier_analyse/<int:patient_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_analyse')
+@app.route('/modifier_analyse/<int:dossier_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_analyse')
 @role_required('Laborantin')
-def modifier_analyse(patient_id, index):
+def modifier_analyse(dossier_id, index):
     # Verify if the lab technician has access
-    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, Patient_ID=patient_id, role='Laborantin').first()
+    acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
         flash("Vous n'avez pas accès à ce dossier.", "danger")
         return redirect(url_for('dashboard_laborantin'))
 
-    dossier = ProfilMedical.query.filter_by(Patient_ID=patient_id).first()
+    dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier or "analyses" not in dossier.Dossier or index >= len(dossier.Dossier["analyses"]):
         flash("Analyse introuvable.", "danger")
-        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
     # Get the analysis
     analyse = dossier.Dossier["analyses"][index]
@@ -570,7 +712,7 @@ def modifier_analyse(patient_id, index):
     # Only the original author can modify or delete it
     if "ajouté_par" not in analyse or analyse["ajouté_par"] != current_user.ID_User:
         flash("Vous ne pouvez modifier ou supprimer que les analyses que vous avez ajoutées.", "danger")
-        return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+        return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
     if request.method == 'POST':
         if 'delete' in request.form:
@@ -580,13 +722,13 @@ def modifier_analyse(patient_id, index):
             # Force updating the JSON column
             db.session.execute(
                 ProfilMedical.__table__.update()
-                .where(ProfilMedical.Patient_ID == patient_id)
+                .where(ProfilMedical.ID_Dossier == dossier_id)
                 .values(Dossier=dossier_data)
             )
             db.session.commit()
 
             flash("Analyse supprimée avec succès.", "success")
-            return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+            return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
         else:  # Update analysis
             type_analyse = request.form.get('type')
@@ -603,15 +745,50 @@ def modifier_analyse(patient_id, index):
             # Force updating the JSON column
             db.session.execute(
                 ProfilMedical.__table__.update()
-                .where(ProfilMedical.Patient_ID == patient_id)
+                .where(ProfilMedical.ID_Dossier == dossier_id)
                 .values(Dossier=dossier_data)
             )
             db.session.commit()
 
             flash("Analyse modifiée avec succès.", "success")
-            return redirect(url_for('dossier_medical_laborantin', patient_id=patient_id))
+            return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
-    return render_template('laborantin/modifier_analyse.html', patient_id=patient_id, analyse=analyse)
+    return render_template('laborantin/modifier_analyse.html', dossier_id=dossier_id, analyse=analyse)
+
+
+# ---------------------------------------------------------------------------- #
+#                                    Patient                                   #
+# ---------------------------------------------------------------------------- #
+@app.route('/dashboard_patient', endpoint='dashboard_patient')
+@role_required('Patient')  
+def dashboard_patient():
+    # Récupérer les informations du patient
+    patient = db.session.query(Utilisateur).filter(Utilisateur.ID_User == current_user.ID_User).first()
+
+    # Récupérer les dossiers médicaux du patient
+    dossiers_medical = db.session.query(ProfilMedical) \
+        .join(MedecinTraitant, ProfilMedical.traitant_ID == MedecinTraitant.ID) \
+        .filter(MedecinTraitant.patient_ID == current_user.ID_User) \
+        .all()
+
+    # Construire les informations des dossiers
+    dossiers_info = []
+    for dossier in dossiers_medical:
+        medecin_traitant = db.session.query(Utilisateur.nom, Utilisateur.prenom) \
+            .filter(Utilisateur.ID_User == dossier.traitant.medecin_ID) \
+            .first()
+        
+        dossiers_info.append({
+            'ID_Dossier': dossier.ID_Dossier,
+            'medecin_nom': medecin_traitant.nom if medecin_traitant else "Non assigné",
+            'medecin_prenom': medecin_traitant.prenom if medecin_traitant else ""
+        })
+
+    return render_template(
+        'patient/dashboard.html',
+        patient=patient,
+        dossiers_info=dossiers_info
+    )
 
 
 if __name__ == '__main__':

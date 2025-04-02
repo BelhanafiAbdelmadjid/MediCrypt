@@ -26,14 +26,14 @@ def run_go_program(command, input_data=None):
 
 def generate_keys(identity):
     result = run_go_program("generate_keys", {"identity": identity})
-    if result:
-        print(f"Clé privée générée pour {identity}.")
+    # if result:
+    #     print(f"Clé privée générée pour {identity}.")
 
 def encrypt(identity, message):
     encoded_message = base64.b64encode(message.encode()).decode()
     result = run_go_program("encrypt", {"identity": identity, "message": encoded_message})
     if result:
-        print("Message chiffré:", result["ciphertext"])
+        # print("Message chiffré:", result["ciphertext"])
         return result["ciphertext"]
     return None
 
@@ -41,7 +41,7 @@ def decrypt(identity, ciphertext):
     result = run_go_program("decrypt", {"identity": identity, "ciphertext": ciphertext})
     if result:
         plaintext = base64.b64decode(result["plaintext"]).decode("utf-8")
-        print("Message déchiffré:", plaintext)
+        # print("Message déchiffré:", plaintext)
         return plaintext
     return None
 

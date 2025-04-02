@@ -4,6 +4,7 @@ from flask_login import LoginManager, login_user, login_required, current_user, 
 from datetime import datetime
 from models import db, Utilisateur, MedecinTraitant, ProfilMedical, Acces
 import json
+import base64
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ehealth.db'
@@ -73,6 +74,8 @@ def logout():
 @app.route('/dashboard_medecin', endpoint='dashboard_medecin')
 @role_required('Médecin')
 def dashboard_medecin():
+    from utils.cryptIT import encryptDossier, decryptDossier
+
     # Récupérer les patients actifs avec leurs informations
     patients_actifs = (
         db.session.query(Utilisateur)
@@ -164,6 +167,7 @@ def liste_dossiers_patient(patient_id):
 @app.route('/dossier_medical/<int:dossier_id>', endpoint='dossier_medical')
 @login_required
 def dossier_medical(dossier_id):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Récupérer le dossier médical
     dossier = ProfilMedical.query.get_or_404(dossier_id)
 
@@ -175,6 +179,16 @@ def dossier_medical(dossier_id):
 
     patient_id = medecin_traitant.patient_ID
     patient = Utilisateur.query.get(patient_id)
+
+    try:
+        print("decrypting")
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        print("decrypting",decrypted_dossier)
+    except Exception as e:
+        print(f"Erreur lors du déchiffrement du dossier: {str(e)}")
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
 
     # Vérification des accès
     if current_user.role == "Médecin":
@@ -192,7 +206,7 @@ def dossier_medical(dossier_id):
     elif current_user.role == "Radiologue":
         # Vérifier si le radiologue a réalisé des imageries pour ce patient
         imageries_autorisees = [
-            imagerie for imagerie in dossier.Dossier.get("imagerie", [])
+            imagerie for imagerie in decrypted_dossier.get("imagerie", [])
             if imagerie.get("ajouté_par") == current_user.ID_User
         ]
         if not imageries_autorisees:
@@ -203,7 +217,7 @@ def dossier_medical(dossier_id):
     elif current_user.role == "Laborantin":
         # Vérifier si le laborantin a réalisé des analyses pour ce patient
         analyses_autorisees = [
-            analyse for analyse in dossier.Dossier.get("analyses", [])
+            analyse for analyse in decrypted_dossier.get("analyses", [])
             if analyse.get("ajouté_par") == current_user.ID_User
         ]
         if not analyses_autorisees:
@@ -224,7 +238,8 @@ def dossier_medical(dossier_id):
     }
 
     if acces_complet:
-        dossier_data = dossier.Dossier if isinstance(dossier.Dossier, dict) else {}
+        
+        dossier_data = json.loads(decrypted_dossier)
 
         # Enrichir la section Analyses et Radiologies avec les informations de "ajouté_par"
         for analyse in dossier_data.get("analyses", []):
@@ -269,6 +284,7 @@ def dossier_medical(dossier_id):
 @app.route('/modifier_dossier/<int:dossier_id>', methods=['GET', 'POST'], endpoint='modifier_dossier')
 @role_required('Médecin')
 def modifier_dossier(dossier_id):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Vérifier si le dossier médical existe
     dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
     if not dossier:
@@ -281,10 +297,20 @@ def modifier_dossier(dossier_id):
         return redirect(url_for('dashboard_medecin'))
 
     # Correction des traitements mal formatés (si nécessaire)
-    if "traitements" in dossier.Dossier:
-        if isinstance(dossier.Dossier["traitements"], list):
+    try:
+        print("DECRYPTING",dossier.Dossier)
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        decrypted_dossier = json.loads(decrypted_dossier)
+        print("DECRYPTED",decrypted_dossier)
+    except Exception as e:
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
+    dossier.Dossier = decrypted_dossier
+    if "traitements" in decrypted_dossier:
+        if isinstance(decrypted_dossier["traitements"], list):
             traitements_corriges = []
-            for t in dossier.Dossier["traitements"]:
+            for t in decrypted_dossier["traitements"]:
                 if isinstance(t, str):  # Si c'est une chaîne mal formatée
                     try:
                         t = json.loads(t.replace("'", "\""))  # Remplacement des apostrophes simples
@@ -292,7 +318,10 @@ def modifier_dossier(dossier_id):
                         print("⚠ Erreur de conversion JSON :", t)  # Debugging
                         continue  # Ignorer ce traitement mal formé
                 traitements_corriges.append(t)
-            dossier.Dossier["traitements"] = traitements_corriges
+            decrypted_dossier["traitements"] = traitements_corriges
+    
+    if request.method == "GET" :
+        return render_template('medecin/modifier_dossier.html', dossier=dossier)
 
     if request.method == 'POST':
         # Récupération des données du formulaire
@@ -301,15 +330,15 @@ def modifier_dossier(dossier_id):
         noms = request.form.getlist('traitements_nom[]')
         doses = request.form.getlist('traitements_dose[]')
         frequences = request.form.getlist('traitements_frequence[]')
-
-        # Charger les données actuelles du dossier
-        dossier_data = dossier.Dossier.copy() if dossier.Dossier else {}
+       
+        # dossier_data = decrypted_dossier
+        print("UPDATING",decrypted_dossier)
 
         # Mise à jour des champs modifiables
         if historique:
-            dossier_data["historique"] = historique
+            decrypted_dossier["historique"] = historique
         if notes:
-            dossier_data["notes"] = notes
+            decrypted_dossier["notes"] = notes
 
         # Vérification des doublons et mise à jour des traitements
         traitements_uniques = set()
@@ -321,24 +350,38 @@ def modifier_dossier(dossier_id):
             traitements_uniques.add(nom)
             traitements_list.append({"nom": nom, "dose": dose, "frequence": freq})
 
-        dossier_data["traitements"] = traitements_list  # Mise à jour des traitements sans doublons
+        decrypted_dossier["traitements"] = traitements_list  # Mise à jour des traitements sans doublons
+        print("UPDATED BEFIRE ENCRYP",decrypted_dossier)
+        try : 
+            encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(decrypted_dossier))
+            encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+        except Exception as e :
+            print("Could not encrypt",e)
+            flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+            return redirect(url_for('home'))
 
-        # Mise à jour du dossier médical dans la base de données
-        db.session.execute(
-            ProfilMedical.__table__.update()
-            .where(ProfilMedical.ID_Dossier == dossier_id)
-            .values(Dossier=dossier_data)
-        )
+        print(f"Type of encrypted_dossier before saving: {type(encoded_data)}")
+        print(f"Value of encrypted_dossier: {encoded_data}")
+       
+        # profile = db.session.query(ProfilMedical).filter_by(ID_Dossier=dossier_id).first()
+        # if profile:
+        dossier.Dossier = encoded_data  # Assign encrypted string
         db.session.commit()
-
         flash("Dossier médical mis à jour avec succès.", "success")
         return redirect(url_for('dossier_medical', dossier_id=dossier_id))
+        # Mise à jour du dossier médical dans la base de données
+        # db.session.execute(
+        #     ProfilMedical.__table__.update()
+        #     .where(ProfilMedical.ID_Dossier == dossier_id)
+        #     .values(Dossier=str(encrypted_dossier))
+        # )
+        # db.session.commit()
 
-    return render_template('medecin/modifier_dossier.html', dossier=dossier)
 
 @app.route('/associer_patient', methods=['GET', 'POST'], endpoint='associer_patient')
 @role_required('Médecin')
 def associer_patient():
+    from utils.cryptIT import encryptDossier, decryptDossier
     if request.method == 'POST':
         patient_id = request.form['patient_id']
 
@@ -364,6 +407,15 @@ def associer_patient():
         )
         db.session.add(nouveau_traitant)
         db.session.flush() 
+        # Encryption
+        initial_dossier = {
+            "historique": "",
+            "traitements": [],
+            "imagerie": [],
+            "analyses": []
+        }
+        encrypted_dossier = encryptDossier(nouveau_traitant.medecin.email, initial_dossier)  # Encrypt using doctor's email
+        encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
         nouveau_dossier =  ProfilMedical(
             # Patient_ID=patient_id,
             # medecin_ID=current_user.ID_User,
@@ -371,12 +423,7 @@ def associer_patient():
             actif=True,
             date_debut=date_debut,
             date_fin=date_fin,
-            Dossier={
-                "historique": "",
-                "traitements": [],
-                "imagerie": [],
-                "analyses": []
-            }
+            Dossier=encoded_data
         )
         db.session.add(nouveau_dossier)
         db.session.commit()
@@ -482,6 +529,7 @@ def dashboard_radiologue():
 @app.route('/dossier_medical_radiologue/<int:dossier_id>', endpoint='dossier_medical_radiologue')
 @role_required('Radiologue')
 def dossier_medical_radiologue(dossier_id):
+    from utils.cryptIT import decryptDossier
     # Vérifier si le radiologue a accès au dossier médical
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
@@ -490,17 +538,27 @@ def dossier_medical_radiologue(dossier_id):
 
     # Récupérer le dossier médical
     dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
+    
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_radiologue'))
+    
+    try:
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        decrypted_dossier = json.loads(decrypted_dossier)
+    except Exception as e:
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
 
     # Le radiologue ne voit que la partie "imagerie"
-    imagerie = dossier.Dossier.get("imagerie", [])
+    imagerie = decrypted_dossier.get("imagerie", [])
 
     return render_template('radiologue/dossier_medical_radiologue.html', dossier=imagerie, dossier_id=dossier_id, Utilisateur=Utilisateur)
 @app.route('/ajouter_imagerie/<int:dossier_id>', methods=['GET', 'POST'], endpoint='ajouter_imagerie')
 @role_required('Radiologue')
 def ajouter_imagerie(dossier_id):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Vérifier si l'accès est autorisé
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
@@ -513,12 +571,20 @@ def ajouter_imagerie(dossier_id):
         return redirect(url_for('dashboard_radiologue'))
 
     if request.method == 'POST':
+        try:
+            decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+            decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+            decrypted_dossier = json.loads(decrypted_dossier)
+        except Exception as e:
+            flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+            return redirect(url_for('home'))
+        
         type_imagerie = request.form.get('type')
         resultat = request.form.get('resultat')
         date = datetime.today().strftime('%Y-%m-%d')
 
         # Charger les données actuelles du dossier
-        dossier_data = dossier.Dossier.copy() if dossier.Dossier else {}
+        dossier_data = decrypted_dossier
 
         # Ajouter la section "imagerie" si elle n'existe pas
         if "imagerie" not in dossier_data:
@@ -531,12 +597,18 @@ def ajouter_imagerie(dossier_id):
             "résultat": resultat,
             "ajouté_par": current_user.ID_User  
         })
-
+        try : 
+            encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+            encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+        except Exception as e :
+            print("Could not encrypt",e)
+            flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+            return redirect(url_for('home'))
         # 🔥 **Mise à jour forcée de la colonne JSON**
         db.session.execute(
             ProfilMedical.__table__.update()
             .where(ProfilMedical.ID_Dossier == dossier_id)
-            .values(Dossier=dossier_data)
+            .values(Dossier=encoded_data)
         )
         db.session.commit()
 
@@ -548,6 +620,7 @@ def ajouter_imagerie(dossier_id):
 @app.route('/modifier_imagerie/<int:dossier_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_imagerie')
 @role_required('Radiologue')
 def modifier_imagerie(dossier_id, index):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Verify if the user has access to the patient's medical records
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Radiologue').first()
     if not acces:
@@ -555,12 +628,20 @@ def modifier_imagerie(dossier_id, index):
         return redirect(url_for('dashboard_radiologue'))
 
     dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
-    if not dossier or "imagerie" not in dossier.Dossier or index >= len(dossier.Dossier["imagerie"]):
+    try:
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        decrypted_dossier = json.loads(decrypted_dossier)
+    except Exception as e:
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
+    
+    if not dossier or "imagerie" not in decrypted_dossier or index >= len(decrypted_dossier["imagerie"]):
         flash("Rapport d'imagerie introuvable.", "danger")
         return redirect(url_for('dossier_medical_radiologue', dossier_id=dossier_id))
 
     # Get the imaging report
-    rapport = dossier.Dossier["imagerie"][index]
+    rapport = decrypted_dossier["imagerie"][index]
 
     # 🔹 **Check if the current user is the one who added the report**
     if "ajouté_par" not in rapport or rapport["ajouté_par"] != current_user.ID_User:
@@ -569,14 +650,21 @@ def modifier_imagerie(dossier_id, index):
 
     if request.method == 'POST':
         if 'delete' in request.form:  # Check if the delete button was pressed
-            dossier_data = dossier.Dossier.copy()
+            dossier_data = decrypted_dossier
             del dossier_data["imagerie"][index]  # Remove the report
 
+            try : 
+                encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+                encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+            except Exception as e :
+                print("Could not encrypt",e)
+                flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+                return redirect(url_for('home'))
             # 🔥 **Force updating the JSON column**
             db.session.execute(
                 ProfilMedical.__table__.update()
                 .where(ProfilMedical.ID_Dossier == dossier_id)
-                .values(Dossier=dossier_data)
+                .values(Dossier=encoded_data)
             )
             db.session.commit()
 
@@ -588,18 +676,25 @@ def modifier_imagerie(dossier_id, index):
             resultat = request.form.get('resultat')
 
             # Load the current dossier data
-            dossier_data = dossier.Dossier.copy()
+            dossier_data = decrypted_dossier
 
             # Update the imaging report
             dossier_data["imagerie"][index]["type"] = type_imagerie
             dossier_data["imagerie"][index]["résultat"] = resultat
             dossier_data["imagerie"][index]["modifié_par"] = current_user.ID_User  # Store the editor ID
 
+            try : 
+                encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+                encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+            except Exception as e :
+                print("Could not encrypt",e)
+                flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+                return redirect(url_for('home'))  
             # 🔥 **Force updating the JSON column**
             db.session.execute(
                 ProfilMedical.__table__.update()
                 .where(ProfilMedical.ID_Dossier == dossier_id)
-                .values(Dossier=dossier_data)
+                .values(Dossier=encoded_data)
             )
             db.session.commit()
 
@@ -629,6 +724,7 @@ def dashboard_laborantin():
 @app.route('/dossier_medical_laborantin/<int:dossier_id>', endpoint='dossier_medical_laborantin')
 @role_required('Laborantin')
 def dossier_medical_laborantin(dossier_id):
+    from utils.cryptIT import decryptDossier
     # Check if the lab technician has access
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
@@ -639,15 +735,24 @@ def dossier_medical_laborantin(dossier_id):
     if not dossier:
         flash("Dossier médical introuvable.", "danger")
         return redirect(url_for('dashboard_laborantin'))
+    
+    try:
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        decrypted_dossier = json.loads(decrypted_dossier)
+    except Exception as e:
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
 
     # The lab technician only sees "analyses"
-    analyses = dossier.Dossier.get("analyses", [])
+    analyses = decrypted_dossier.get("analyses", [])
 
     return render_template('laborantin/dossier_medical_laborantin.html', dossier=analyses, dossier_id=dossier_id, Utilisateur=Utilisateur)
 
 @app.route('/ajouter_analyse/<int:dossier_id>', methods=['GET', 'POST'], endpoint='ajouter_analyse')
 @role_required('Laborantin')
 def ajouter_analyse(dossier_id):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Verify if the lab technician has access
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
@@ -660,12 +765,20 @@ def ajouter_analyse(dossier_id):
         return redirect(url_for('dashboard_laborantin'))
 
     if request.method == 'POST':
+        try:
+            decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+            decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+            decrypted_dossier = json.loads(decrypted_dossier)
+        except Exception as e:
+            flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+            return redirect(url_for('home'))
+        
         type_analyse = request.form.get('type')
         valeur = request.form.get('valeur')
         date = datetime.today().strftime('%Y-%m-%d')
 
         # Load current dossier data
-        dossier_data = dossier.Dossier.copy() if dossier.Dossier else {}
+        dossier_data = decrypted_dossier
 
         # Add "analyses" section if it doesn't exist
         if "analyses" not in dossier_data:
@@ -679,11 +792,19 @@ def ajouter_analyse(dossier_id):
             "ajouté_par": current_user.ID_User  
         })
 
+        try : 
+            encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+            encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+        except Exception as e :
+            print("Could not encrypt",e)
+            flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+            return redirect(url_for('home'))
+
         # Force updating the JSON column
         db.session.execute(
             ProfilMedical.__table__.update()
             .where(ProfilMedical.ID_Dossier == dossier_id)
-            .values(Dossier=dossier_data)
+            .values(Dossier=encoded_data)
         )
         db.session.commit()
 
@@ -695,6 +816,7 @@ def ajouter_analyse(dossier_id):
 @app.route('/modifier_analyse/<int:dossier_id>/<int:index>', methods=['GET', 'POST'], endpoint='modifier_analyse')
 @role_required('Laborantin')
 def modifier_analyse(dossier_id, index):
+    from utils.cryptIT import encryptDossier, decryptDossier
     # Verify if the lab technician has access
     acces = Acces.query.filter_by(Utilisateur_ID=current_user.ID_User, ID_Dossier=dossier_id, role='Laborantin').first()
     if not acces:
@@ -702,12 +824,20 @@ def modifier_analyse(dossier_id, index):
         return redirect(url_for('dashboard_laborantin'))
 
     dossier = ProfilMedical.query.filter_by(ID_Dossier=dossier_id).first()
-    if not dossier or "analyses" not in dossier.Dossier or index >= len(dossier.Dossier["analyses"]):
+    try:
+        decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
+        decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
+        decrypted_dossier = json.loads(decrypted_dossier)
+    except Exception as e:
+        flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+        return redirect(url_for('home'))
+
+    if not dossier or "analyses" not in decrypted_dossier or index >= len(decrypted_dossier["analyses"]):
         flash("Analyse introuvable.", "danger")
         return redirect(url_for('dossier_medical_laborantin', dossier_id=dossier_id))
 
     # Get the analysis
-    analyse = dossier.Dossier["analyses"][index]
+    analyse = decrypted_dossier["analyses"][index]
 
     # Only the original author can modify or delete it
     if "ajouté_par" not in analyse or analyse["ajouté_par"] != current_user.ID_User:
@@ -716,14 +846,21 @@ def modifier_analyse(dossier_id, index):
 
     if request.method == 'POST':
         if 'delete' in request.form:
-            dossier_data = dossier.Dossier.copy()
+            dossier_data = decrypted_dossier
             del dossier_data["analyses"][index]
 
+            try : 
+                encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+                encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+            except Exception as e :
+                print("Could not encrypt",e)
+                flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+                return redirect(url_for('home'))
             # Force updating the JSON column
             db.session.execute(
                 ProfilMedical.__table__.update()
                 .where(ProfilMedical.ID_Dossier == dossier_id)
-                .values(Dossier=dossier_data)
+                .values(Dossier=encoded_data)
             )
             db.session.commit()
 
@@ -735,18 +872,26 @@ def modifier_analyse(dossier_id, index):
             valeur = request.form.get('valeur')
 
             # Load current dossier data
-            dossier_data = dossier.Dossier.copy()
+            dossier_data = decrypted_dossier
 
             # Update the analysis
             dossier_data["analyses"][index]["type"] = type_analyse
             dossier_data["analyses"][index]["valeur"] = valeur
-            dossier_data["analyses"][index]["modifié_par"] = current_user.ID_User  
+            dossier_data["analyses"][index]["modifié_par"] = current_user.ID_User
+
+            try : 
+                encrypted_dossier = encryptDossier(dossier.traitant.medecin.email,json.dumps(dossier_data))
+                encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
+            except Exception as e :
+                print("Could not encrypt",e)
+                flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
+                return redirect(url_for('home'))  
 
             # Force updating the JSON column
             db.session.execute(
                 ProfilMedical.__table__.update()
                 .where(ProfilMedical.ID_Dossier == dossier_id)
-                .values(Dossier=dossier_data)
+                .values(Dossier=encoded_data)
             )
             db.session.commit()
 

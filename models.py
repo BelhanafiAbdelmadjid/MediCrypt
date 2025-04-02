@@ -27,7 +27,8 @@ class ProfilMedical(db.Model):
     __tablename__ = "profilmedical"
     ID_Dossier = db.Column(db.Integer, primary_key=True)
     traitant_ID = db.Column(db.Integer,db.ForeignKey('medecintraitant.ID'))
-    Dossier = db.Column(db.JSON)
+    # Dossier = db.Column(db.JSON)
+    Dossier = db.Column(db.LargeBinary)  
     actif = db.Column(db.Boolean)
     date_debut = db.Column(db.Date)
     date_fin = db.Column(db.Date)

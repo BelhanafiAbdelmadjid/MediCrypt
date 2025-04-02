@@ -181,12 +181,9 @@ def dossier_medical(dossier_id):
     patient = Utilisateur.query.get(patient_id)
 
     try:
-        print("decrypting")
         decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
         decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
-        print("decrypting",decrypted_dossier)
     except Exception as e:
-        print(f"Erreur lors du déchiffrement du dossier: {str(e)}")
         flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
         return redirect(url_for('home'))
 
@@ -240,6 +237,9 @@ def dossier_medical(dossier_id):
     if acces_complet:
         
         dossier_data = json.loads(decrypted_dossier)
+
+        #Décrypte_l'historique_ici
+        #dossier_data.historique = decrypterABE(dossier_data.historique)
 
         # Enrichir la section Analyses et Radiologies avec les informations de "ajouté_par"
         for analyse in dossier_data.get("analyses", []):
@@ -298,15 +298,18 @@ def modifier_dossier(dossier_id):
 
     # Correction des traitements mal formatés (si nécessaire)
     try:
-        print("DECRYPTING",dossier.Dossier)
         decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
         decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
         decrypted_dossier = json.loads(decrypted_dossier)
-        print("DECRYPTED",decrypted_dossier)
     except Exception as e:
         flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
         return redirect(url_for('home'))
+    
     dossier.Dossier = decrypted_dossier
+
+    #Décrypte_l'historique_ici
+    #decrypted_dossier.historique = decrypterABE(decrypted_dossier.historique)
+    
     if "traitements" in decrypted_dossier:
         if isinstance(decrypted_dossier["traitements"], list):
             traitements_corriges = []
@@ -336,6 +339,8 @@ def modifier_dossier(dossier_id):
 
         # Mise à jour des champs modifiables
         if historique:
+            #Crypte_l'historique_ici
+            #decrypted_dossier["historique"] = crypteABE(historique)
             decrypted_dossier["historique"] = historique
         if notes:
             decrypted_dossier["notes"] = notes
@@ -408,12 +413,17 @@ def associer_patient():
         db.session.add(nouveau_traitant)
         db.session.flush() 
         # Encryption
+        
+
         initial_dossier = {
             "historique": "",
             "traitements": [],
             "imagerie": [],
             "analyses": []
         }
+        #Crypte_l'historique_ici
+        # initial_dossier['historique'] = crypterHistoriqueABE("")
+        
         encrypted_dossier = encryptDossier(nouveau_traitant.medecin.email, initial_dossier)  # Encrypt using doctor's email
         encoded_data = base64.b64encode(encrypted_dossier.encode('utf-8')) 
         nouveau_dossier =  ProfilMedical(

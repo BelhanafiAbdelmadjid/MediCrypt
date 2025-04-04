@@ -9,7 +9,7 @@ class Utilisateur(db.Model, UserMixin):
     prenom = db.Column(db.String(50))
     pwd = db.Column(db.String(50))
     email = db.Column(db.String(50), unique=True)
-    role = db.Column(db.Enum('Médecin', 'Radiologue', 'Laborantin', 'Patient', name='role_enum'))
+    role = db.Column(db.Enum('Médecin', 'Radiologue', 'Laborantin', 'Patient', 'Admin', name='role_enum'))
     def get_id(self):
         return str(self.ID_User)
 

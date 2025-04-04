@@ -5,6 +5,7 @@ from datetime import datetime
 from models import db, Utilisateur, MedecinTraitant, ProfilMedical, Acces
 import json
 import base64
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ehealth.db'
@@ -18,6 +19,14 @@ login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id):
     return Utilisateur.query.get(int(user_id))
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.role  != "Admin":
+            flash("Access restricted to administrators only.", "danger")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def role_required(role):
     def decorator(f):
@@ -52,6 +61,8 @@ def login():
             print(user.role)
             if user.role == 'Médecin':
                 return redirect(url_for('dashboard_medecin'))
+            elif user.role == 'Admin':
+                return redirect(url_for("admin_dashboard"))
             elif user.role == 'Radiologue':
                 return redirect(url_for('dashboard_radiologue'))
             elif user.role == 'Laborantin':
@@ -68,6 +79,66 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('home'))
+
+# ---------------------------------------------------------------------------- #
+#                                     Admin                                    #
+# ---------------------------------------------------------------------------- #
+@app.route("/admin/dashboard")
+@admin_required
+def admin_dashboard():
+    admin = current_user
+    
+    # Récupération des utilisateurs par rôle
+    users_by_role = {
+        "Médecin": Utilisateur.query.filter_by(role="Médecin").all(),
+        "Radiologue": Utilisateur.query.filter_by(role="Radiologue").all(),
+        "Laborantin": Utilisateur.query.filter_by(role="Laborantin").all(),
+        "Patient": Utilisateur.query.filter_by(role="Patient").all(),
+    }
+
+    return render_template("/admin/admin_dashboard.html", admin=admin, users_by_role=users_by_role)
+
+@app.route("/admin/add_user", methods=["GET", "POST"])
+@admin_required
+def add_user():
+    if request.method == "POST":
+        # Get the form data
+        email = request.form["email"]
+        password = request.form["password"]
+        role = request.form["role"]
+        nom = request.form["nom"]  # Get the 'Nom' field
+        prenom = request.form["prenom"]  # Get the 'Prénom' field
+
+        # Check if the email already exists
+        if Utilisateur.query.filter_by(email=email).first():
+            flash("Email already exists.", "danger")
+        else:
+            # Create a new user with the additional fields
+            new_user = Utilisateur(
+                email=email,
+                role=role,
+                nom=nom,  # Set the 'Nom' field
+                prenom=prenom  # Set the 'Prénom' field
+            )
+            new_user.pwd = password  # Set the password
+            db.session.add(new_user)
+            db.session.commit()
+
+            flash("User added successfully!", "success")
+            return redirect(url_for('admin_dashboard'))  
+
+    
+    return render_template("/admin/admin_add_user.html")
+
+@app.route("/admin/delete-user/<int:user_id>", methods=["POST","GET"])
+@admin_required
+def delete_user(user_id):
+    user = Utilisateur.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash("Utilisateur supprimé avec succès", "success")
+    return redirect(url_for("admin_dashboard"))
+
 # ---------------------------------------------------------------------------- #
 #                                    Medecin                                   #
 # ---------------------------------------------------------------------------- #
@@ -236,7 +307,10 @@ def dossier_medical(dossier_id):
 
     if acces_complet:
         
-        dossier_data = json.loads(decrypted_dossier)
+        try : 
+            dossier_data = json.loads(decrypted_dossier)
+        except:
+            dossier_data = decrypted_dossier
 
         #Décrypte_l'historique_ici
         #dossier_data.historique = decrypterABE(dossier_data.historique)
@@ -300,7 +374,11 @@ def modifier_dossier(dossier_id):
     try:
         decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
         decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
-        decrypted_dossier = json.loads(decrypted_dossier)
+        # decrypted_dossier = json.loads(decrypted_dossier)
+        try : 
+            decrypted_dossier = json.loads(decrypted_dossier)
+        except:
+            decrypted_dossier = decrypted_dossier
     except Exception as e:
         flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
         return redirect(url_for('home'))
@@ -557,6 +635,7 @@ def dossier_medical_radiologue(dossier_id):
         decoded_data = base64.b64decode(dossier.Dossier).decode('utf-8')
         decrypted_dossier = decryptDossier(dossier.traitant.medecin.email,decoded_data)
         decrypted_dossier = json.loads(decrypted_dossier)
+        
     except Exception as e:
         flash(f"Erreur lors du déchiffrement du dossier: {str(e)}", "danger")
         return redirect(url_for('home'))

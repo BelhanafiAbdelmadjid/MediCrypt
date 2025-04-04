@@ -64,3 +64,6 @@ docker-compose.override.yml
 
 /instance/* 
 /instance/ehealth.db
+
+.ibe_keys
+.ibe_keys.json

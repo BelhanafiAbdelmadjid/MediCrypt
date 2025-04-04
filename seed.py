@@ -7,6 +7,22 @@ from app import app
 
 fake = Faker()
 
+def create_admin():
+    admin_email = "admin@ehealt.com"
+    admin_password = "passwordAdmin"
+
+    existing_admin = Utilisateur.query.filter_by(email=admin_email).first()
+    if not existing_admin:
+        admin = Utilisateur(email=admin_email, role="Admin")
+        admin.pwd = admin_password
+        admin.nom = fake.last_name()
+        admin.prenom = fake.first_name()
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin user created successfully.")
+    else:
+        print("Admin user already exists.")
+
 def seed_utilisateurs():
     with app.app_context():
         roles = ['Médecin', 'Radiologue', 'Laborantin', 'Patient']
@@ -30,5 +46,6 @@ def seed_utilisateurs():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        create_admin()
         seed_utilisateurs()
     print("🎉 SEEDING COMPLET ! Base de données prête.")
